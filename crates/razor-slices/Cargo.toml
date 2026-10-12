@@ -18,6 +18,9 @@ tokio = ["dep:tokio"]
 
 [dependencies]
 tokio = { version = "1", features = ["io-util"], optional = true }
+# SIMD-accelerated byte scanning for the HTML encoder's run detection; see
+# docs/adr/0005-simd-html-encoding.md.
+memchr = "2"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "io-util"] }
