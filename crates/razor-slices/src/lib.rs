@@ -11,5 +11,5 @@
 mod html;
 mod slice;
 
-pub use html::{encode_html_to, HtmlString};
+pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use slice::{RenderError, Slice};
