@@ -1,0 +1,48 @@
+name: Release
+
+# Publishing to crates.io, gated behind a manual trigger (never automatic on
+# push/PR). See https://github.com/davidfowl/razor-rust/issues/7.
+#
+# Defaults to a dry run so this workflow is safe to run at any time (e.g. to
+# sanity-check the package before a real release) without requiring the
+# `CARGO_REGISTRY_TOKEN` secret to exist yet. A real publish requires both
+# setting `dry_run: false` and the repository having a `CARGO_REGISTRY_TOKEN`
+# secret configured (crates.io API token) — ask @davidfowl to add it under
+# Settings > Secrets and variables > Actions when the project is ready to
+# publish its first release.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (does not publish to crates.io)"
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify workspace builds and tests pass
+        run: |
+          cargo build --workspace --all-targets --locked
+          cargo test --workspace --locked
+
+      - name: cargo publish (dry run)
+        if: ${{ inputs.dry_run }}
+        run: cargo publish -p razor-slices --locked --dry-run
+
+      - name: cargo publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p razor-slices --locked
