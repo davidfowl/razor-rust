@@ -1,0 +1,12 @@
+[package]
+name = "razor-slices"
+description = "Lightweight, high-performance templates for Rust, inspired by RazorSlices for ASP.NET Core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
