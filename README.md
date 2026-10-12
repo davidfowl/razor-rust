@@ -15,6 +15,10 @@ rendering — without pulling in a full web/MVC framework.
 - A `Slice` trait (`crates/razor-slices`) for rendering a template to a
   `String` or `Vec<u8>`, with HTML-encoding of interpolated values —
   implemented by hand for now (see the example below).
+- Byte-oriented, low-allocation HTML encoding: `encode_html_to_writer` writes
+  UTF-8 directly to any `std::io::Write` sink (no intermediate `String`), and
+  `WriteHtmlValue` formats numbers/bools into a stack buffer instead of
+  allocating — see [#10](https://github.com/davidfowl/razor-rust/issues/10).
 - CI on GitHub Actions: build, test, `clippy`, and `rustfmt` checks on every PR.
 
 ```rust
