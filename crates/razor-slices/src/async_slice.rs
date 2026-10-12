@@ -30,7 +30,7 @@ use crate::{RenderError, Slice};
 /// This is the Rust equivalent of upstream's `PipeWriter` / `TextWriter`
 /// destination for `RenderAsync`. Implementors adapt whatever writer their
 /// async runtime or framework exposes (see the `tokio` feature's
-/// [`TokioWriter`] for a ready-made `tokio::io::AsyncWrite` adapter).
+/// `TokioWriter` for a ready-made `tokio::io::AsyncWrite` adapter).
 ///
 /// Methods return `impl Future<..> + Send` (rather than using `async fn`
 /// sugar directly) so the returned futures are `Send`, which multi-threaded
