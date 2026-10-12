@@ -41,6 +41,9 @@ let html = Hello { name: "World" }.render_to_string().unwrap();
 assert_eq!(html, "<p>Hello, World!</p>");
 ```
 
+Runnable version: [`crates/razor-slices/examples/hello.rs`](crates/razor-slices/examples/hello.rs)
+(`cargo run -p razor-slices --example hello`).
+
 ## What's next
 
 - [#3](https://github.com/davidfowl/razor-rust/issues/3) — template syntax
