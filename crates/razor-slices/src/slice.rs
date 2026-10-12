@@ -65,6 +65,22 @@ pub trait Slice {
     }
 }
 
+// Blanket impls so `&dyn Slice`, `Box<dyn Slice>`, etc. are themselves
+// `Slice`s: useful groundwork for composing slices (layouts rendering a
+// child slice, partials embedded in a parent template — see #4/#5), where a
+// slice is held/passed around as a trait object rather than a concrete type.
+impl<S: Slice + ?Sized> Slice for &S {
+    fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+        (**self).render(writer)
+    }
+}
+
+impl<S: Slice + ?Sized> Slice for Box<S> {
+    fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+        (**self).render(writer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -101,5 +117,28 @@ mod tests {
     fn renders_to_bytes() {
         let slice = Hello { name: "World" };
         assert_eq!(slice.render_to_bytes().unwrap(), b"<p>Hello, World!</p>");
+    }
+
+    #[test]
+    fn reference_to_slice_renders_like_the_slice() {
+        let slice = Hello { name: "World" };
+        let by_ref: &Hello = &slice;
+        assert_eq!(by_ref.render_to_string().unwrap(), "<p>Hello, World!</p>");
+    }
+
+    #[test]
+    fn boxed_slice_renders_like_the_slice() {
+        let boxed: Box<dyn Slice> = Box::new(Hello { name: "World" });
+        assert_eq!(boxed.render_to_string().unwrap(), "<p>Hello, World!</p>");
+    }
+
+    #[test]
+    fn boxed_dyn_slice_can_be_passed_where_impl_slice_is_expected() {
+        fn render_any(slice: &impl Slice) -> String {
+            slice.render_to_string().unwrap()
+        }
+
+        let boxed: Box<dyn Slice> = Box::new(Hello { name: "World" });
+        assert_eq!(render_any(&boxed), "<p>Hello, World!</p>");
     }
 }
