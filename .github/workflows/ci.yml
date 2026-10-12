@@ -33,3 +33,50 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+      - name: Run examples
+        run: cargo run -p razor-slices --example hello
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Fails the build on broken intra-doc links / missing docs warnings,
+      # matching the docs epic's "keep docs current" convention (#9).
+      - name: cargo doc (deny warnings)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --workspace --no-deps --document-private-items
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin to the `rust-version` declared in the workspace manifest so a PR
+      # that accidentally relies on a newer feature fails CI instead of
+      # silently breaking the documented MSRV.
+      - name: Read MSRV from Cargo.toml
+        id: msrv
+        run: |
+          version=$(grep -m1 '^rust-version' Cargo.toml | sed -E 's/.*"(.*)".*/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install MSRV Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build with MSRV
+        run: cargo build --workspace --all-targets
+
+      - name: Test with MSRV
+        run: cargo test --workspace

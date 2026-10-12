@@ -19,7 +19,10 @@ rendering — without pulling in a full web/MVC framework.
   UTF-8 directly to any `std::io::Write` sink (no intermediate `String`), and
   `WriteHtmlValue` formats numbers/bools into a stack buffer instead of
   allocating — see [#10](https://github.com/davidfowl/razor-rust/issues/10).
-- CI on GitHub Actions: build, test, `clippy`, and `rustfmt` checks on every PR.
+- CI on GitHub Actions: build, test, `clippy`, `rustfmt`, `cargo doc` (deny
+  warnings), and an MSRV (1.75) build/test job on every PR. A manually
+  triggered, dry-run-by-default release workflow is ready for crates.io
+  publishing once a `CARGO_REGISTRY_TOKEN` secret is configured.
 
 ```rust
 use razor_slices::{encode_html_to, Slice};
