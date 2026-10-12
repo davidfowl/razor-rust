@@ -39,19 +39,14 @@ impl From<&str> for HtmlString {
     }
 }
 
-/// Returns `true` if `b` is one of the ASCII bytes this module HTML-encodes
-/// (`&`, `<`, `>`, `"`, `'`).
+/// Returns the HTML entity for one of the 5 reserved ASCII bytes this
+/// module encodes: `&`, `<`, `>`, `"`, `'`.
 ///
 /// All of these are single-byte ASCII code points, and no UTF-8 continuation
 /// or lead byte for a multi-byte character ever equals an ASCII byte value,
 /// so scanning the raw UTF-8 byte representation of a `&str` for these bytes
 /// (rather than decoding `char`s) is always safe and never splits a
-/// multi-byte sequence.
-#[inline]
-fn needs_escape(b: u8) -> bool {
-    matches!(b, b'&' | b'<' | b'>' | b'"' | b'\'')
-}
-
+/// multi-byte sequence. See [`next_escape`] for how the scan itself works.
 #[inline]
 fn escape_entity(b: u8) -> &'static str {
     match b {
@@ -61,6 +56,28 @@ fn escape_entity(b: u8) -> &'static str {
         b'"' => "&quot;",
         b'\'' => "&#39;",
         _ => unreachable!("escape_entity called with a non-escaped byte"),
+    }
+}
+
+/// Returns the index of the next byte in `bytes` that needs escaping, or
+/// `None` if there isn't one.
+///
+/// Delegates to [`memchr`]'s SIMD-accelerated (SSE2/AVX2 on x86_64, NEON on
+/// aarch64, with a scalar fallback elsewhere) byte search instead of
+/// testing one byte at a time. `memchr` only supports needles of up to 3
+/// distinct bytes, so the 5 escaped bytes (`& < > " '`) are split into two
+/// sub-scans — `memchr3` for `& < >` and `memchr2` for `" '` — and the
+/// nearer match (if either) is returned. See ADR
+/// [0005](../../docs/adr/0005-simd-html-encoding.md).
+#[inline]
+fn next_escape(bytes: &[u8]) -> Option<usize> {
+    let angle_amp = memchr::memchr3(b'&', b'<', b'>', bytes);
+    let quotes = memchr::memchr2(b'"', b'\'', bytes);
+    match (angle_amp, quotes) {
+        (Some(a), Some(q)) => Some(a.min(q)),
+        (Some(a), None) => Some(a),
+        (None, Some(q)) => Some(q),
+        (None, None) => None,
     }
 }
 
@@ -75,14 +92,13 @@ fn write_encoded<E>(
     mut write_all: impl FnMut(&[u8]) -> Result<(), E>,
 ) -> Result<(), E> {
     let mut start = 0;
-    for (i, &b) in bytes.iter().enumerate() {
-        if needs_escape(b) {
-            if start < i {
-                write_all(&bytes[start..i])?;
-            }
-            write_all(escape_entity(b).as_bytes())?;
-            start = i + 1;
+    while let Some(offset) = next_escape(&bytes[start..]) {
+        let i = start + offset;
+        if start < i {
+            write_all(&bytes[start..i])?;
         }
+        write_all(escape_entity(bytes[i]).as_bytes())?;
+        start = i + 1;
     }
     if start < bytes.len() {
         write_all(&bytes[start..])?;
@@ -244,6 +260,44 @@ impl_write_html_value_for_float!(f32, f64);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn next_escape_finds_nearest_of_either_memchr_group() {
+        // `>` is in the memchr3(&,<,>) group; `'` is in the memchr2(",')
+        // group. The nearer one (by index) must win regardless of which
+        // sub-scan found it.
+        assert_eq!(next_escape(b"ab>cd'ef"), Some(2));
+        assert_eq!(next_escape(b"ab'cd>ef"), Some(2));
+        assert_eq!(next_escape(b"no escapes here"), None);
+        assert_eq!(next_escape(b""), None);
+    }
+
+    #[test]
+    fn encode_html_to_writer_handles_consecutive_escapes() {
+        let mut out = Vec::new();
+        encode_html_to_writer("<<>>&&\"\"''", &mut out).unwrap();
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "&lt;&lt;&gt;&gt;&amp;&amp;&quot;&quot;&#39;&#39;"
+        );
+    }
+
+    #[test]
+    fn encode_html_to_writer_handles_escape_at_start_and_end() {
+        let mut out = Vec::new();
+        encode_html_to_writer("<middle>", &mut out).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "&lt;middle&gt;");
+    }
+
+    #[test]
+    fn encode_html_to_writer_handles_long_run_without_escapes() {
+        // Exercises the memchr scan across a run long enough to span
+        // multiple SIMD lanes on typical targets.
+        let long_text = "x".repeat(4096);
+        let mut out = Vec::new();
+        encode_html_to_writer(&long_text, &mut out).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), long_text);
+    }
 
     #[test]
     fn encodes_reserved_characters() {
