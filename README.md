@@ -2,7 +2,7 @@
 
 A lightweight, high-performance template library for Rust, inspired by
 [RazorSlices](https://github.com/DamianEdwards/RazorSlices) for ASP.NET Core:
-compile-time checked templates, low allocations, and (soon) async/streaming
+compile-time checked templates, low allocations, and async/streaming
 rendering — without pulling in a full web/MVC framework.
 
 > **Status: early scaffolding.** The core rendering runtime exists; template
@@ -15,6 +15,12 @@ rendering — without pulling in a full web/MVC framework.
 - A `Slice` trait (`crates/razor-slices`) for rendering a template to a
   `String` or `Vec<u8>`, with HTML-encoding of interpolated values —
   implemented by hand for now (see the example below).
+- Streaming rendering via `render_async`/`AsyncSliceWriter` — a runtime-
+  agnostic way to write a rendered `Slice` directly to a destination (e.g. an
+  HTTP response body) instead of building a full buffer first. No async
+  runtime is a mandatory dependency; enable the default-off `tokio` Cargo
+  feature for a ready-made `tokio::io::AsyncWrite` adapter (`TokioWriter`).
+  See [#11](https://github.com/davidfowl/razor-rust/issues/11).
 - Byte-oriented, low-allocation HTML encoding: `encode_html_to_writer` writes
   UTF-8 directly to any `std::io::Write` sink (no intermediate `String`), and
   `WriteHtmlValue` formats numbers/bools into a stack buffer instead of
@@ -56,8 +62,6 @@ Runnable version: [`crates/razor-slices/examples/hello.rs`](crates/razor-slices/
 - [#5](https://github.com/davidfowl/razor-rust/issues/5) — partials
 - [#6](https://github.com/davidfowl/razor-rust/issues/6) — web framework
   integration (axum first)
-- [#11](https://github.com/davidfowl/razor-rust/issues/11) — async/streaming
-  rendering
 
 Full breakdown and live status: see the sub-issues checked off in
 [#1](https://github.com/davidfowl/razor-rust/issues/1).

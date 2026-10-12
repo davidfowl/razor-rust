@@ -7,6 +7,17 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Default-off: the core crate has no mandatory async-runtime dependency (see
+# the design-decision comment on
+# https://github.com/davidfowl/razor-rust/issues/11). Enable this feature to
+# get a `tokio::io::AsyncWrite` adapter (`TokioWriter`) for streaming
+# rendering, e.g. for the axum integration tracked in
+# https://github.com/davidfowl/razor-rust/issues/6.
+tokio = ["dep:tokio"]
+
 [dependencies]
+tokio = { version = "1", features = ["io-util"], optional = true }
 
 [dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "io-util"] }
