@@ -3,9 +3,10 @@
 //!
 //! This initial version renders synchronously to an in-memory buffer
 //! (`String` / `Vec<u8>`), matching the subset of upstream's supported
-//! rendering targets that doesn't require async I/O. Async/streaming
-//! rendering to a writer (mirroring `RenderAsync(PipeWriter, ...)`) is
-//! tracked as a follow-up: <https://github.com/davidfowl/razor-rust/issues/11>.
+//! rendering targets that doesn't require async I/O. Streaming rendering to
+//! an async writer (mirroring `RenderAsync(PipeWriter, ...)`) is provided by
+//! [`crate::render_async`] / [`crate::AsyncSliceWriter`]
+//! (<https://github.com/davidfowl/razor-rust/issues/11>).
 
 use std::fmt;
 
@@ -55,11 +56,12 @@ pub trait Slice {
 
     /// Renders the template and returns the UTF-8 encoded bytes.
     ///
-    /// This is a straightforward `String` -> `Vec<u8>` conversion for now;
-    /// a direct-to-bytes fast path (avoiding the UTF-16/UTF-8 non-issue that
+    /// This is a straightforward `String` -> `Vec<u8>` conversion for now; a
+    /// direct-to-bytes fast path (avoiding the UTF-16/UTF-8 non-issue that
     /// `String` sidesteps, but still avoiding an intermediate `String`
-    /// allocation) is tracked as a follow-up alongside
-    /// <https://github.com/davidfowl/razor-rust/issues/11>.
+    /// allocation) is a possible future optimization. For streaming output
+    /// directly to a destination without buffering first, see
+    /// [`crate::render_async`].
     fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
         Ok(self.render_to_string()?.into_bytes())
     }
