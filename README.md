@@ -64,7 +64,9 @@ Runnable version: [`crates/razor-slices/examples/hello.rs`](crates/razor-slices/
   integration (axum first)
 
 Full breakdown and live status: see the sub-issues checked off in
-[#1](https://github.com/davidfowl/razor-rust/issues/1).
+[#1](https://github.com/davidfowl/razor-rust/issues/1). Design decisions and
+their tradeoffs are tracked as Architecture Decision Records in
+[`docs/adr/`](docs/adr/README.md).
 
 ## Building
 
