@@ -554,6 +554,146 @@ async fn http_client(
     (sender, tokio::spawn(connection))
 }
 
+struct AbortOnDrop<T>(tokio::task::JoinHandle<T>);
+
+impl<T> Drop for AbortOnDrop<T> {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+#[derive(Default)]
+struct DisconnectState {
+    suspended: tokio::sync::Notify,
+    released: tokio::sync::Notify,
+    dropped: tokio::sync::Notify,
+    drop_count: AtomicUsize,
+    completed: AtomicUsize,
+    write_pending: std::sync::atomic::AtomicBool,
+    dropped_during_write: std::sync::atomic::AtomicBool,
+}
+
+struct DisconnectGuard(Arc<DisconnectState>);
+
+impl Drop for DisconnectGuard {
+    fn drop(&mut self) {
+        self.0.dropped_during_write.store(
+            self.0.write_pending.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+        self.0.drop_count.fetch_add(1, Ordering::SeqCst);
+        self.0.dropped.notify_one();
+    }
+}
+
+struct DisconnectPage {
+    state: Arc<DisconnectState>,
+    write_until_disconnected: bool,
+}
+
+impl AsyncSlice for DisconnectPage {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        let _guard = DisconnectGuard(self.state.clone());
+        output.write_literal("prefix").await?;
+        output.flush().await?;
+        if self.write_until_disconnected {
+            let text = "x".repeat(64 * 1_024);
+            loop {
+                let mut write = std::pin::pin!(output.write_literal(&text));
+                std::future::poll_fn(|cx| {
+                    let result = std::future::Future::poll(write.as_mut(), cx);
+                    let pending = result.is_pending();
+                    self.state.write_pending.store(pending, Ordering::SeqCst);
+                    if pending {
+                        self.state.suspended.notify_one();
+                    }
+                    result
+                })
+                .await?;
+            }
+        }
+        self.state.suspended.notify_one();
+        self.state.released.notified().await;
+        self.state.completed.fetch_add(1, Ordering::SeqCst);
+        output.write_literal("must not be rendered").await?;
+        Ok(())
+    }
+}
+
+async fn real_peer_disconnect(write_until_disconnected: bool) {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let state = Arc::new(DisconnectState::default());
+        let captured = state.clone();
+        let app = Router::new().route(
+            "/",
+            get(move || {
+                let state = captured.clone();
+                async move {
+                    StreamingSliceResponse::new(DisconnectPage {
+                        state,
+                        write_until_disconnected,
+                    })
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let _server = AbortOnDrop(tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        }));
+        let (mut client, connection) = http_client(address).await;
+        let mut connection = AbortOnDrop(connection);
+        let response = client
+            .send_request(
+                Request::builder()
+                    .uri("/")
+                    .header("host", address.to_string())
+                    .body(Empty::new())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let mut output = response.into_body();
+        assert_eq!(
+            output.frame().await.unwrap().unwrap().into_data().unwrap(),
+            b"prefix".as_slice()
+        );
+        state.suspended.notified().await;
+        assert_eq!(state.drop_count.load(Ordering::SeqCst), 0);
+        assert_eq!(state.completed.load(Ordering::SeqCst), 0);
+
+        // Aborting the client driver closes its TCP socket, not the server body.
+        connection.0.abort();
+        assert!((&mut connection.0).await.unwrap_err().is_cancelled());
+        drop(output);
+        drop(client);
+        state.dropped.notified().await;
+        assert_eq!(state.drop_count.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            state.dropped_during_write.load(Ordering::SeqCst),
+            write_until_disconnected
+        );
+        state.released.notify_one();
+        assert_eq!(state.completed.load(Ordering::SeqCst), 0);
+    })
+    .await
+    .expect("real peer disconnect must drop the suspended server renderer");
+}
+
+#[tokio::test]
+async fn real_peer_disconnect_cancels_held_application_await() {
+    real_peer_disconnect(false).await;
+}
+
+#[tokio::test]
+async fn real_peer_disconnect_cancels_pending_destination_write() {
+    real_peer_disconnect(true).await;
+}
+
 #[tokio::test]
 async fn real_http_prefix_is_received_before_separate_release_request_and_exact_suffix() {
     tokio::time::timeout(std::time::Duration::from_secs(10), async {

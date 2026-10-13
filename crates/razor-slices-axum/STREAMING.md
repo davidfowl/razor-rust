@@ -112,6 +112,19 @@ spawned application work is not cancelled. Peer-disconnect detection/body
 drop is controlled by Hyper/Axum; this adds no standalone request cancellation
 token. Panics/allocator failures are not caught.
 
+The real HTTP/1 disconnect tests receive a prefix over TCP, then abort and
+join the client connection driver to close its socket. Before stopping the
+server, they observe the server-owned rendering future's drop guard. One
+renderer is suspended on an unreleased application notification; another
+continuously writes fixed-size text and records actual `Poll::Pending`
+destination writes. Its drop guard confirms cancellation during a pending
+write, not successful completion or a later application wait. Owned client
+and server task guards also abort on assertion failure or timeout.
+Notifications synchronize the tests without sleeps; a timeout only detects
+deadlocks. This verifies framework-triggered body drop on the supported
+local HTTP/1 transport, not a standalone request-aborted token, exact TCP
+buffer capacity, disconnect-detection deadline, or proxy/HTTP/2 behavior.
+
 ## Verification and remaining parity
 
 ```sh
@@ -122,8 +135,9 @@ cargo build --locked -p razor-slices-axum --example streaming_server
 The HTTP suite preserves all buffered response regressions and adds streaming
 lazy start, selected status/content type, prefix-before-await, original-source
 error/logging, early failure, empty EOF, bounded Unicode frames/slow consumers,
-drop cancellation, HEAD without execution and an actual TCP HTTP/1 release
-handshake. Workspace stable/MSRV/default/all-features CI executes the suite;
+drop cancellation, HEAD without execution, an actual TCP HTTP/1 release
+handshake, and real peer disconnects during application and destination
+awaits. Workspace stable/MSRV/default/all-features CI executes the suite;
 existing buffered server smoke coverage remains intact.
 
 Grounded in pinned upstream
@@ -139,6 +153,10 @@ It preserves streaming order and post-start failure rather than buffered
 Request cancellation tokens, writer completion flags/threshold flush,
 disposal and broader .NET encoder policy remain
 [#11](https://github.com/davidfowl/razor-rust/issues/11).
+Real disconnect regression coverage is tracked by
+[#54](https://github.com/davidfowl/razor-rust/issues/54);
+request context and forced empty-prefix response commitment remain
+[#52](https://github.com/davidfowl/razor-rust/issues/52).
 Generated async templates remain [#3](https://github.com/davidfowl/razor-rust/issues/3);
 inherited layout/section context remains
 [#47](https://github.com/davidfowl/razor-rust/issues/47)/
