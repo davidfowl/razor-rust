@@ -39,6 +39,9 @@ impl From<fmt::Error> for RenderError {
 /// codegen crate (tracked in <https://github.com/davidfowl/razor-rust/issues/3>),
 /// but the trait is hand-implementable, which is useful for tests and for
 /// this initial runtime-only milestone.
+///
+/// References and boxes implement this trait by forwarding all rendering
+/// methods, including any overrides of the convenience methods below.
 pub trait Slice {
     /// Writes the rendered template body to `writer`.
     ///
@@ -56,12 +59,10 @@ pub trait Slice {
 
     /// Renders the template and returns the UTF-8 encoded bytes.
     ///
-    /// This is a straightforward `String` -> `Vec<u8>` conversion for now; a
-    /// direct-to-bytes fast path (avoiding the UTF-16/UTF-8 non-issue that
-    /// `String` sidesteps, but still avoiding an intermediate `String`
-    /// allocation) is a possible future optimization. For streaming output
-    /// directly to a destination without buffering first, see
-    /// [`crate::render_async`].
+    /// The default implementation converts [`Self::render_to_string`] into
+    /// bytes. Implementations can override this method to render directly
+    /// into a byte buffer. [`crate::render_async`] uses this method before
+    /// writing the buffered result to its async destination.
     fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
         Ok(self.render_to_string()?.into_bytes())
     }
@@ -75,11 +76,27 @@ impl<S: Slice + ?Sized> Slice for &S {
     fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
         (**self).render(writer)
     }
+
+    fn render_to_string(&self) -> Result<String, RenderError> {
+        (**self).render_to_string()
+    }
+
+    fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+        (**self).render_to_bytes()
+    }
 }
 
 impl<S: Slice + ?Sized> Slice for Box<S> {
     fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
         (**self).render(writer)
+    }
+
+    fn render_to_string(&self) -> Result<String, RenderError> {
+        (**self).render_to_string()
+    }
+
+    fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+        (**self).render_to_bytes()
     }
 }
 
@@ -191,7 +208,31 @@ mod tests {
         let boxed: Box<dyn Slice> = Box::new(Overrides);
         assert_overrides(&boxed);
         assert_overrides(Box::new(Box::new(boxed)));
-        assert_overrides(&&Overrides);
+        assert_overrides::<&&Overrides>(&&Overrides);
+    }
+
+    #[test]
+    fn wrappers_preserve_default_bytes_using_a_string_override() {
+        struct StringOverride;
+
+        impl Slice for StringOverride {
+            fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+                writer.write_str("render")
+            }
+
+            fn render_to_string(&self) -> Result<String, RenderError> {
+                Ok("string override".to_owned())
+            }
+        }
+
+        fn assert_bytes<S: Slice>(slice: S) {
+            assert_eq!(Slice::render_to_bytes(&slice).unwrap(), b"string override");
+        }
+
+        assert_bytes(&StringOverride);
+        let boxed: Box<dyn Slice> = Box::new(StringOverride);
+        assert_bytes(&boxed);
+        assert_bytes(boxed);
     }
 
     struct FailingOverrides;

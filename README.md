@@ -15,9 +15,14 @@ rendering — without pulling in a full web/MVC framework.
 - A `Slice` trait (`crates/razor-slices`) for rendering a template to a
   `String` or `Vec<u8>`, with HTML-encoding of interpolated values —
   implemented by hand for now (see the example below).
-- Streaming rendering via `render_async`/`AsyncSliceWriter` — a runtime-
-  agnostic way to write a rendered `Slice` directly to a destination (e.g. an
-  HTTP response body) instead of building a full buffer first. No async
+- References and boxes (including `&dyn Slice` and `Box<dyn Slice>`) forward
+  all rendering methods, preserving custom `render_to_string` and
+  `render_to_bytes` overrides and their errors through generic dispatch.
+- Buffered async rendering via `render_async`/`AsyncSliceWriter` — a runtime-
+  agnostic way to write a rendered `Slice` to a destination (e.g. an
+  HTTP response body). It calls `render_to_bytes`, including any override,
+  before writing and flushing the complete buffer; incremental, mid-template
+  streaming is not implemented yet. No async
   runtime is a mandatory dependency; enable the default-off `tokio` Cargo
   feature for a ready-made `tokio::io::AsyncWrite` adapter (`TokioWriter`).
   See [#11](https://github.com/davidfowl/razor-rust/issues/11).
