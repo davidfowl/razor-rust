@@ -78,7 +78,8 @@ comparisons; MSRV compares the integrated sample's actual stdout as well.
 
 Typed generated async templates from verified Ready #58/#59 are included.
 Their initial interpolation accepts strings, not all synchronous primitive,
-trusted-HTML or attribute values; broader generated value parity remains #3/#11.
+trusted-HTML or attribute values; focused generated value parity is
+[#62](https://github.com/davidfowl/razor-rust/issues/62) under #3/#2/#11.
 Reserved ADR reconciliation #28/#29 is not overwritten. Current source
 instructions and README describe the assembled code, not historical
 scaffolding.

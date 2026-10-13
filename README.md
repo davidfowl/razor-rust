@@ -95,7 +95,8 @@ is open. Servers run locally; no hosted preview or deployment is provided.
   template grammar and value-type parity. Typed async declarations, nested
   control flow, await/flush, child and section directives from
   [PR #59](https://github.com/davidfowl/razor-rust/pull/59) are included here;
-  initial async interpolation accepts strings, not all synchronous value types.
+  initial async interpolation accepts strings, not all synchronous value types
+  ([focused parity #62](https://github.com/davidfowl/razor-rust/issues/62)).
 - [#47](https://github.com/davidfowl/razor-rust/issues/47): inherited and async
   layout/section context beyond explicit associations.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /
