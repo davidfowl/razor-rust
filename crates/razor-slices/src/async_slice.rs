@@ -3,15 +3,17 @@
 //! The synchronous [`crate::Slice`] trait renders to an in-memory buffer
 //! (`String` / `Vec<u8>`). Upstream's primary rendering path is async and
 //! streaming (`RenderAsync(PipeWriter, ...)` / `RenderAsync(TextWriter, ...)`),
-//! writing directly into the HTTP response body as the template renders,
-//! rather than building a full buffer first. This module adds the Rust
-//! equivalent, tracked in <https://github.com/davidfowl/razor-rust/issues/11>.
+//! writing into the destination as the template renders, rather than building
+//! a full buffer first. [`AsyncSlice`] / [`render_incremental`] provide this
+//! execution path; [`render_async`] retains the buffered synchronous bridge.
+//! HTTP integration remains separate work. This module is tracked in
+//! <https://github.com/davidfowl/razor-rust/issues/11>.
 //!
 //! ## Runtime dependency
 //!
 //! This crate does not mandate any particular async runtime for its core
 //! rendering path. [`AsyncSliceWriter`] is a minimal, hand-rolled trait (using
-//! native `async fn` in traits, stable since Rust 1.75 — this crate's MSRV) so
+//! return-position `impl Future` in traits, stable since Rust 1.75, our MSRV) so
 //! that consumers on `tokio`, `async-std`, `smol`, or any other executor can
 //! all implement it for their own writer types without this crate pulling in
 //! any of them as a mandatory dependency. A ready-made adapter for
