@@ -101,9 +101,11 @@ declared-layout bypass has focused follow-up
 [#36](https://github.com/davidfowl/razor-rust/issues/36) under #4.
 There is no optional missing body: use an empty slice deliberately.
 
-Named sections, declarative model/layout association, inherited layout context
-and async execution remain in [#4](https://github.com/davidfowl/razor-rust/issues/4).
-No Razor `@section` syntax is introduced (upstream does not support it).
+Explicit lazy synchronous named sections are described in [SECTIONS.md](SECTIONS.md)
+with a complete `sections` example. That separate delivery stacks on this one;
+it does not introduce Razor `@section` syntax (upstream does not support it).
+Declarative model/layout association, inherited layout context and async execution
+remain in [#4](https://github.com/davidfowl/razor-rust/issues/4).
 Generated model declarations/control-flow/conditional attributes remain
 [#3](https://github.com/davidfowl/razor-rust/issues/3); async/context-aware partials
 [#5](https://github.com/davidfowl/razor-rust/issues/5); web integration

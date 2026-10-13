@@ -38,6 +38,18 @@ pub struct Section<'a, S> {
 /// use razor_slices::section;
 /// let _ = section("not a slice", "footer");
 /// ```
+///
+/// A borrowed insertion name must remain valid:
+///
+/// ```compile_fail
+/// use razor_slices::{html, section};
+/// let insertion;
+/// {
+///     let name = String::from("footer");
+///     insertion = section(html! {}, &name);
+/// }
+/// let _ = html! { {insertion} };
+/// ```
 pub fn section<S: Slice>(slice: S, name: &str) -> Section<'_, S> {
     Section { slice, name }
 }
@@ -90,13 +102,9 @@ impl<S: Slice> WriteHtmlValue for Section<'_, S> {
 /// }
 /// let _ = body.render_to_string();
 /// ```
-pub fn with_section<S: Slice, T: Slice>(
-    body: S,
-    name: impl Into<String>,
-    content: T,
-) -> io::Result<impl Slice> {
-    let name = name.into();
-    validate_name(&name)?;
+pub fn with_section<S: Slice, T: Slice>(body: S, name: &str, content: T) -> io::Result<impl Slice> {
+    validate_name(name)?;
+    let name = name.to_owned();
     Ok(Sectioned {
         body,
         name,
