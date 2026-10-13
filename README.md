@@ -69,6 +69,9 @@ cargo run --locked -p razor-slices --example integration
 # Observe a section prefix before later application work completes:
 cargo run --locked -p razor-slices --example async_sections --features tokio
 
+# Generate a typed reusable async template; observe its prefix on both renders:
+cargo run --locked -p razor-slices --example async_template --features tokio
+
 # Actual HTTP streaming; release the held page from another terminal:
 cargo run --locked -p razor-slices-axum --example streaming_server
 curl --no-buffer -i http://127.0.0.1:3000/stream
@@ -82,14 +85,17 @@ is open. Servers run locally; no hosted preview or deployment is provided.
 | --- | --- |
 | Model, control flow, attributes, layout, sections and bare partial | [Integrated example](crates/razor-slices/examples/integration.rs), [exact output](crates/razor-slices/tests/fixtures/integration.html), [integration guide](docs/integration.md) |
 | Incremental rendering and async sections | [Async rendering](docs/async-rendering.md), [section handshake](docs/async-sections.md) |
+| Generated typed async templates | [Grammar, ownership and actual prefix handshake](docs/async-templates.md) |
 | Atomic buffered HTTP response | [Axum sample](crates/razor-slices-axum/README.md) |
 | Bounded streaming HTTP response | [Server, commands and transport limits](crates/razor-slices-axum/STREAMING.md) |
 
 ## What's next
 
-- [#3](https://github.com/davidfowl/razor-rust/issues/3): generated typed
-  declarations and async template syntax, currently being delivered in
-  [PR #59](https://github.com/davidfowl/razor-rust/pull/59).
+- [#3](https://github.com/davidfowl/razor-rust/issues/3): broader generated
+  template grammar and value-type parity. Typed async declarations, nested
+  control flow, await/flush, child and section directives from
+  [PR #59](https://github.com/davidfowl/razor-rust/pull/59) are included here;
+  initial async interpolation accepts strings, not all synchronous value types.
 - [#47](https://github.com/davidfowl/razor-rust/issues/47): inherited and async
   layout/section context beyond explicit associations.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /

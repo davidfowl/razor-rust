@@ -48,6 +48,9 @@ do not duplicate work already in progress.
   UTF-8, the five escaped characters (`&`, `<`, `>`, `"`, `'`), and writer
   error propagation when working here.
 - Inline `html!` generates reusable slices with nested conditionals/loops.
+  `async_template!` generates model-typed reusable `AsyncSlice` declarations
+  with explicit await/flush, child and section directives. Initial async
+  interpolation accepts strings, not all `WriteHtmlValue` types.
   Partials, conditional attributes, layouts and named sections are implemented
   in this source. Declared layouts bypass full-document rendering when used
   as children, but explicitly composed documents remain composed. Preserve
@@ -58,7 +61,7 @@ do not duplicate work already in progress.
   headers and cannot replace already-started responses. The body owns its
   renderer and bounded frames, with no spawned producer.
 - This integration preview assembles unmerged deliveries, not a released
-  full port. Generated async templates remain tracked in
+  full port. Broader generated value/grammar parity remains tracked in
   [#3](https://github.com/davidfowl/razor-rust/issues/3); inherited/async layout
   context, request lifetime and broader parity remain #47/#52/#11.
   See [docs/integration.md](docs/integration.md) for exact source dependencies.

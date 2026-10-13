@@ -140,3 +140,11 @@ jobs:
         run: |
           cargo run -p razor-slices --example integration ${{ matrix.cargo-flags }} > target/integration-output.html
           diff -u crates/razor-slices/tests/fixtures/integration.html target/integration-output.html
+
+      - name: Verify async sample handshakes with MSRV
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run -p razor-slices --example async_sections --features tokio > target/async-sections-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_sections.txt target/async-sections-output.txt
+          cargo run -p razor-slices --example async_template --features tokio > target/async-template-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt

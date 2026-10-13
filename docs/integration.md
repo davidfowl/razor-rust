@@ -25,6 +25,7 @@ authorize repository merges, publishing or deployment.
 | #53 | `cf3a5d875c0f5823a6620cccfa4fe96c46bd5cb9` | Declared layouts and child bypass |
 | #55 | `2b891f6899f58f2c3e4384d4344c782ee6c11594` | Real peer-disconnect acceptance |
 | #57 | `be83e5807137e8b62a55def0321f9c317b737fd8` | Empty-prefix HTTP/1 header commitment |
+| #59 | `e10fe1cf8fa451e13264129abe916ac81183878a` | Typed generated async templates |
 
 The HTTP stack includes clean copies of #38's original commits. Combining
 #49 retains the original async history as well; duplicate implementation
@@ -55,6 +56,19 @@ empty models, and original destination error kind/source while failing inside
 an attribute or footer. Existing individual feature suites remain intact.
 The HTTP suite exercises both atomic buffered output and real incremental
 delivery, peer disconnects and post-header failures.
+The streaming HTTP sample now uses a generated `async_template!` declaration
+with an owned model, explicit flush and application await. Its existing real
+TCP test receives the prefix before releasing work and compares the same exact
+UTF-8 body fixture, validating generated-code/runtime/framework composition.
+
+```sh
+cargo run --locked -p razor-slices --example async_template --features tokio > target/async-template-output.txt
+diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
+```
+
+This independent typed-template executable additionally observes prefixes on
+both renders using its small duplex/Notify handshake, proving reusable fresh
+application awaits rather than cached output or consumed futures.
 
 Stable and MSRV 1.75 CI build/test the combined workspace in default and
 all-features modes. Stable also runs warning-free Clippy/docs and exact sample
@@ -62,8 +76,9 @@ comparisons; MSRV compares the integrated sample's actual stdout as well.
 
 ## Remaining work
 
-Generated typed async templates are separately being delivered in #58/#59;
-they are not included or claimed verified by this initial assembly.
+Typed generated async templates from verified Ready #58/#59 are included.
+Their initial interpolation accepts strings, not all synchronous primitive,
+trusted-HTML or attribute values; broader generated value parity remains #3/#11.
 Reserved ADR reconciliation #28/#29 is not overwritten. Current source
 instructions and README describe the assembled code, not historical
 scaffolding.

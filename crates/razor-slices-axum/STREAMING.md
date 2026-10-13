@@ -9,6 +9,11 @@ The two existing async commits were applied on this isolated branch without
 source conflicts; none of the delivered branches was changed.
 Integrate #31/#33/#40 and #38 before this milestone. These APIs are not yet
 on main; the cumulative main diff includes the disclosed dependencies.
+The combined-source preview in [PR #61](https://github.com/davidfowl/razor-rust/pull/61)
+also includes typed generated async templates from #59. Its streaming page
+uses `async_template!` with an owned model, explicit flush and awaited release;
+the commands and exact HTTP fixture below are unchanged. See
+[the integration guide](../../docs/integration.md) for the full pinned stack.
 
 ## Run a real streaming page
 
