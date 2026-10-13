@@ -72,8 +72,8 @@ borrowed page twice through a **one-byte duplex buffer**. The reader compares
 the entire prefix and the unchanged section-completion count before notifying
 later section work. The generated header explicitly flushes before awaiting.
 It then compares every completed byte. The generated bare partial emits only
-the page body and does not execute its sections. No sleep, producer task or
-full-page/section buffering can satisfy this handshake.
+the page body and does not execute its sections. No sleep or producer task is
+used; full-page/section buffering would deadlock this handshake.
 
 [Regressions](../crates/razor-slices/tests/async_layouts.rs) additionally hold a
 flush pending even after application release, stop at all 15 writer boundaries,

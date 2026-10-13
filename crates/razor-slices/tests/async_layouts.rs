@@ -593,7 +593,10 @@ fn every_nested_sample_write_preserves_original_failure_and_stops_suffix() {
         Poll::Ready(Ok(()))
     ));
     let total = state.lock().unwrap().writes;
-    assert!(total > 10);
+    assert_eq!(
+        total, 15,
+        "sample boundary count must match pending-write coverage"
+    );
     for fail_at in 0..total {
         let state = Arc::new(Mutex::new(State {
             fail_write: Some(fail_at),
