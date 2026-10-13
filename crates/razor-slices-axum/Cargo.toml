@@ -1,6 +1,6 @@
 [package]
 name = "razor-slices-axum"
-description = "Buffered Axum responses for Razor Slices templates."
+description = "Buffered and incremental Axum responses for Razor Slices templates."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,7 +9,9 @@ rust-version.workspace = true
 
 [dependencies]
 axum = { version = "=0.7.9", default-features = false }
+futures-core = { version = "0.3", default-features = false }
 razor-slices = { version = "0.1.0", path = "../razor-slices" }
+tokio = { version = "=1.43.0", default-features = false, features = ["sync"] }
 tracing = "0.1"
 
 [dev-dependencies]
@@ -17,6 +19,6 @@ axum = { version = "=0.7.9", default-features = false, features = ["http1", "tok
 http-body-util = "0.1"
 # Keep the server/test dependency graph compatible with Cargo/Rust 1.75.
 hyper-util = "=0.1.10"
-tokio = { version = "=1.43.0", features = ["macros", "rt", "net"] }
+tokio = { version = "=1.43.0", features = ["macros", "rt", "net", "time"] }
 tower = { version = "=0.5.2", features = ["util"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "registry"] }

@@ -336,6 +336,7 @@ name = "razor-slices-axum"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "futures-core",
  "http-body-util",
  "hyper-util",
  "razor-slices",

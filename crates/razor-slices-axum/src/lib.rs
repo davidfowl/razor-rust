@@ -1,7 +1,9 @@
-//! Buffered, UTF-8 HTML responses for Axum 0.7.
+//! Buffered and incremental UTF-8 HTML responses for Axum 0.7.
 //!
 //! [`SliceResponse`] renders synchronously before publishing a response body.
 //! It does not stream, execute async templates, or change the core runtime.
+//! [`StreamingSliceResponse`] executes an owned async template as its response
+//! body is polled, with bounded output and drop-based cancellation.
 //!
 //! ```
 //! use axum::{http::StatusCode, response::IntoResponse};
@@ -22,6 +24,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use razor_slices::Slice;
+
+mod streaming;
+pub use streaming::StreamingSliceResponse;
 
 /// A slice returned from an Axum handler as fully buffered UTF-8 HTML.
 ///
