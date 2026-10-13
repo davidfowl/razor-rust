@@ -42,9 +42,15 @@ jobs:
       - name: Test
         run: cargo test --workspace ${{ matrix.cargo-flags }}
 
+      - name: Test renamed runtime dependency
+        if: matrix.features == 'default'
+        run: cargo test --manifest-path crates/razor-slices/tests/renamed/Cargo.toml
+
       - name: Run examples
         if: matrix.features == 'default'
-        run: cargo run -p razor-slices --example hello
+        run: |
+          cargo run -p razor-slices --example hello
+          cargo run -p razor-slices --example inline
 
   docs:
     runs-on: ubuntu-latest
@@ -103,3 +109,7 @@ jobs:
 
       - name: Test with MSRV
         run: cargo test --workspace ${{ matrix.cargo-flags }}
+
+      - name: Test renamed runtime dependency with MSRV
+        if: matrix.features == 'default'
+        run: cargo test --manifest-path crates/razor-slices/tests/renamed/Cargo.toml

@@ -184,6 +184,12 @@ pub trait WriteHtmlValue {
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()>;
 }
 
+impl<T: WriteHtmlValue + ?Sized> WriteHtmlValue for &T {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).write_html_to(writer)
+    }
+}
+
 impl WriteHtmlValue for str {
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         encode_html_to_writer(self, writer)

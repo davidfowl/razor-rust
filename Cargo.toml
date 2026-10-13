@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/razor-slices"]
+members = ["crates/razor-slices", "crates/razor-slices-macros"]
 
 [workspace.package]
 version = "0.1.0"

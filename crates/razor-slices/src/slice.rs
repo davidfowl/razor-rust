@@ -35,10 +35,9 @@ impl From<fmt::Error> for RenderError {
 /// A renderable template, equivalent to upstream's `RazorSlice` /
 /// `RazorSlice<TModel>`.
 ///
-/// Implementations are normally generated from a template file by the
-/// codegen crate (tracked in <https://github.com/davidfowl/razor-rust/issues/3>),
-/// but the trait is hand-implementable, which is useful for tests and for
-/// this initial runtime-only milestone.
+/// Implementations can be generated inline with [`crate::html!`] or written
+/// by hand. Further codegen work is tracked in
+/// <https://github.com/davidfowl/razor-rust/issues/3>.
 pub trait Slice {
     /// Writes the rendered template body to `writer`.
     ///
