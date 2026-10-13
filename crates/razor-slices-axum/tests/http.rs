@@ -19,6 +19,8 @@ use razor_slices_axum::{SliceResponse, StreamingSliceResponse};
 use tower::ServiceExt;
 use tracing::instrument::WithSubscriber;
 
+#[path = "../../razor-slices/examples/support/async_values.rs"]
+mod generated_values;
 #[path = "../examples/support/page.rs"]
 mod page;
 #[path = "../examples/support/streaming.rs"]
@@ -851,4 +853,60 @@ async fn real_http_prefix_is_received_before_separate_release_request_and_exact_
     })
     .await
     .expect("prefix-before-release HTTP handshake must not deadlock");
+}
+
+#[tokio::test]
+async fn generated_mixed_values_stream_exactly_over_http_before_later_work() {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let release = Arc::new(tokio::sync::Notify::new());
+        let loads = Arc::new(AtomicUsize::new(0));
+        let captured_release = release.clone();
+        let captured_loads = loads.clone();
+        let app = Router::new().route(
+            "/values",
+            get(move || {
+                let page = generated_values::ValuePage::new(generated_values::ValueModel::demo(
+                    captured_release.clone(),
+                    captured_loads.clone(),
+                ));
+                async move { StreamingSliceResponse::new(page) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let _server = AbortOnDrop(tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        }));
+        let (mut client, connection) = http_client(address).await;
+        let _connection = AbortOnDrop(connection);
+        let response = client
+            .send_request(
+                Request::builder()
+                    .uri("/values")
+                    .header("host", address.to_string())
+                    .body(Empty::new())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers()["content-type"],
+            "text/html; charset=utf-8"
+        );
+        let mut output = response.into_body();
+        let mut prefix = Vec::new();
+        while prefix.len() < generated_values::PREFIX.len() {
+            let frame = output.frame().await.unwrap().unwrap().into_data().unwrap();
+            prefix.extend_from_slice(&frame);
+        }
+        assert_eq!(prefix, generated_values::PREFIX.as_bytes());
+        assert_eq!(loads.load(Ordering::SeqCst), 0);
+        release.notify_one();
+        prefix.extend_from_slice(&output.collect().await.unwrap().to_bytes());
+        assert_eq!(prefix, generated_values::PAGE.as_bytes());
+        assert_eq!(loads.load(Ordering::SeqCst), 1);
+    })
+    .await
+    .expect("generated value HTTP prefix handshake must not deadlock");
 }

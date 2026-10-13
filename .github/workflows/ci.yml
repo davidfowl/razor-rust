@@ -74,6 +74,12 @@ jobs:
           cargo run -p razor-slices --example async_template --features tokio > target/async-template-output.txt
           diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
 
+      - name: Verify generated mixed-value prefix handshake and stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run -p razor-slices --example async_values --features tokio > target/async-values-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_values.txt target/async-values-output.txt
+
   docs:
     runs-on: ubuntu-latest
     strategy:
@@ -148,3 +154,5 @@ jobs:
           diff -u crates/razor-slices/tests/fixtures/async_sections.txt target/async-sections-output.txt
           cargo run -p razor-slices --example async_template --features tokio > target/async-template-output.txt
           diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
+          cargo run -p razor-slices --example async_values --features tokio > target/async-values-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_values.txt target/async-values-output.txt

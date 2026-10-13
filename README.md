@@ -35,6 +35,10 @@ rendering — without pulling in a full web/MVC framework.
 - Axum adapters for atomic buffered HTML responses and bounded incremental
   streaming responses, with runnable servers and real HTTP/1 regressions
   for prefix delivery, peer-disconnect cancellation and post-start failures.
+- Generated `async_template!` interpolation for bools/numbers, escaped
+  strings/references, explicit trusted `HtmlString` and conditional attributes.
+  Built-ins use fixed encoding/format scratch; custom values must explicitly
+  implement `AsyncWriteHtmlValue`, not just `Display` or `WriteHtmlValue`.
 - Byte-oriented, low-allocation HTML encoding: `encode_html_to_writer` writes
   UTF-8 directly to any `std::io::Write` sink (no intermediate `String`), and
   `WriteHtmlValue` formats numbers/bools into a stack buffer instead of
@@ -72,6 +76,9 @@ cargo run --locked -p razor-slices --example async_sections --features tokio
 # Generate a typed reusable async template; observe its prefix on both renders:
 cargo run --locked -p razor-slices --example async_template --features tokio
 
+# Mixed typed values, trusted HTML and conditional attributes before later work:
+cargo run --locked -p razor-slices --example async_values --features tokio
+
 # Actual HTTP streaming; release the held page from another terminal:
 cargo run --locked -p razor-slices-axum --example streaming_server
 curl --no-buffer -i http://127.0.0.1:3000/stream
@@ -95,8 +102,10 @@ is open. Servers run locally; no hosted preview or deployment is provided.
   template grammar and value-type parity. Typed async declarations, nested
   control flow, await/flush, child and section directives from
   [PR #59](https://github.com/davidfowl/razor-rust/pull/59) are included here;
-  initial async interpolation accepts strings, not all synchronous value types
-  ([focused parity #62](https://github.com/davidfowl/razor-rust/issues/62)).
+  [focused value parity #62](https://github.com/davidfowl/razor-rust/issues/62) /
+  [PR #63](https://github.com/davidfowl/razor-rust/pull/63) adds existing built-in
+  values and conditional attributes. Custom Display/date formatting and broader
+  encoder policy remain outside this bounded milestone.
 - [#47](https://github.com/davidfowl/razor-rust/issues/47): inherited and async
   layout/section context beyond explicit associations.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /

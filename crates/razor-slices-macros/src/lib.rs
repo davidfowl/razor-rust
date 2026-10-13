@@ -178,7 +178,7 @@ fn generate_parts(
             Syntax::Sync => quote! {
                 #runtime::WriteHtmlValue::write_html_to(&(#value), #writer)?;
             },
-            Syntax::Async => quote! { #writer.write_value(&(#value)).await?; },
+            Syntax::Async => quote! { #writer.write_html_value(&(#value)).await?; },
         },
         Part::If {
             condition,

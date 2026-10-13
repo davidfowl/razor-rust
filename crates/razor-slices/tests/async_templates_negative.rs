@@ -13,7 +13,7 @@ fn declaration_grammar_model_lifetime_send_and_unused_await_contracts() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        output.status.success() && stdout.contains("27 passed"),
+        output.status.success() && stdout.contains("32 passed"),
         "async declaration compile-fail contract failed:\n{stdout}\n{stderr}"
     );
 }

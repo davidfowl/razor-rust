@@ -141,10 +141,14 @@
 //! } }
 //! ```
 //!
-//! Async values must be strings, with no silent Display/raw fallback.
+//! Unsupported Display values have no silent formatting/raw fallback.
 //! ```compile_fail
 //! use razor_slices::async_template;
-//! async_template! { struct Page { model: u32 } => { {model} } }
+//! struct Unsupported;
+//! impl std::fmt::Display for Unsupported {
+//!     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str("<raw>") }
+//! }
+//! async_template! { struct Page { model: Unsupported } => { {model} } }
 //! ```
 //!
 //! Synchronous html! does not acquire async directives.
@@ -190,4 +194,54 @@
 //! #![deny(unused_must_use)]
 //! use razor_slices::async_template;
 //! async_template! { struct Page { model: String } => { @{ async {}; } } }
+//! ```
+//!
+//! Char is not an existing synchronous WriteHtmlValue type either.
+//! ```compile_fail
+//! use razor_slices::async_template;
+//! async_template! { struct Page { model: char } => { {model} } }
+//! ```
+//!
+//! A synchronous custom value must explicitly opt into async output.
+//! ```compile_fail
+//! use razor_slices::{async_template, WriteHtmlValue};
+//! struct SyncOnly;
+//! impl WriteHtmlValue for SyncOnly {
+//!     fn write_html_to(&self, w: &mut dyn std::io::Write) -> std::io::Result<()> { w.write_all(b"x") }
+//! }
+//! async_template! { struct Page { model: SyncOnly } => { {model} } }
+//! ```
+//!
+//! Custom synchronous attributes also require an explicit async contract.
+//! ```compile_fail
+//! use razor_slices::{async_template, attribute, AttributeValue};
+//! struct SyncOnly;
+//! impl AttributeValue for SyncOnly {
+//!     fn write_attribute_value(&self, _: &str, w: &mut dyn std::io::Write) -> std::io::Result<()> { w.write_all(b"x") }
+//! }
+//! async_template! { struct Page { model: SyncOnly } => { {attribute("title", model).unwrap()} } }
+//! ```
+//!
+//! Borrowed attribute values cannot escape storage through generated models.
+//! ```compile_fail
+//! use razor_slices::{async_template, attribute, Attribute};
+//! async_template! { struct Page<'a> { model: Attribute<'a, &'a str> } => { {model} } }
+//! let page;
+//! {
+//!     let text = String::from("borrowed");
+//!     page = Page::new(attribute("title", text.as_str()).unwrap());
+//! }
+//! drop(page);
+//! ```
+//!
+//! Borrowed attribute names cannot escape storage either.
+//! ```compile_fail
+//! use razor_slices::{async_template, attribute, Attribute};
+//! async_template! { struct Page<'a> { model: Attribute<'a, bool> } => { {model} } }
+//! let page;
+//! {
+//!     let name = String::from("checked");
+//!     page = Page::new(attribute(&name, true).unwrap());
+//! }
+//! drop(page);
 //! ```

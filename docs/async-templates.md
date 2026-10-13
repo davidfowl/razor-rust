@@ -5,6 +5,9 @@
 declaration/async milestone [#58](https://github.com/davidfowl/razor-rust/issues/58)
 under [#3](https://github.com/davidfowl/razor-rust/issues/3), using the incremental
 runtime tracked in [#11](https://github.com/davidfowl/razor-rust/issues/11).
+[#62 / PR #63](https://github.com/davidfowl/razor-rust/pull/63) adds typed
+bounded value parity on frozen integration #61 head
+`7b6a8aeac067a06f64eae656a79ccdea5b035619`, carrying its unmerged dependencies.
 Its PR is cumulative over the unmerged control-flow and async-section stacks;
 this document describes the branch, not features already landed on main.
 
@@ -41,7 +44,7 @@ Every body (including nested branches/loops) accepts:
 | Syntax | Meaning |
 | --- | --- |
 | `"trusted markup"` or a raw string literal | Await an unescaped literal write |
-| `{ RustExpression }` | Evaluate and await escaped string output |
+| `{ RustExpression }` | Evaluate and await typed `AsyncWriteHtmlValue` output |
 | `if condition { body } else if condition { body } else { body }` | Ordinary Rust conditional selection, including `if let` |
 | `for pattern in expression { body }` | Ordinary Rust iteration with scoped bindings |
 | `@{ Rust statements }` | Render-local bindings, application work and Rust awaits; bindings remain in the containing template scope |
@@ -57,13 +60,40 @@ For values, use `@{ let value = fetch(model).await?; }` followed by `{value}`,
 or `{fetch(model).await?}`. Normal Rust diagnostics still apply to code-block
 statements; the macro does not suppress must-use warnings.
 
-Interpolation must coerce to `&str` (`str`, `String` and references work).
-It uses the existing bounded HTML encoder for `& < > " '`, preserving UTF-8.
-Unlike synchronous `html!`, it does not accept arbitrary `WriteHtmlValue`
-implementations or `HtmlString`. Format numbers explicitly, e.g.
-`{model.count.to_string()}`; such application formatting can allocate, while
-generated encoding itself uses only the runtime's fixed-size scratch buffer.
-Trusted markup belongs in literals or an async child.
+Interpolation uses the explicit `AsyncWriteHtmlValue` contract. Built-ins are
+`str`, `String`, references, `bool`, all Rust signed/unsigned integer families,
+`f32`/`f64`, trusted `HtmlString`, and validated `attribute(name, value)` adapters.
+Strings escape `& < > " '` once and preserve UTF-8, using the existing encoder
+in at most 1,024-byte input chunks and a fixed 6,144-byte scratch buffer.
+Integers share the synchronous 40-byte format buffer; floats share the
+400-byte format buffer without the synchronous heap fallback (format overflow
+returns an `InvalidData` I/O error). Built-in formatting is the existing Rust
+representation, including lowercase body `true`/`false`, negative zero,
+infinities and NaN; it is not a new C# culture/format policy.
+
+Trusted `HtmlString` is borrowed and emitted verbatim, like literal markup,
+without output copying. Literal/trusted/name writes can borrow arbitrarily long
+inputs directly; the 6,144-byte encoded-write bound is not a maximum size for
+these raw writes. Scratch is independent of input length, not a bound on
+application-owned model memory, sink storage or custom implementation behavior.
+The original string-only `AsyncHtmlWriter::write_value` API remains intact.
+`char` is not currently a synchronous `WriteHtmlValue` type and is not added.
+
+`attribute` keeps its existing validation and omission rules: true repeats the
+name, false/`None` omit the entire attribute, `Some` and references delegate,
+and empty strings retain ` name=""`. Text/numeric/trusted values use the typed
+async path. Invalid names fail construction even for omitted values; there is
+no URL normalization or sanitization. `HtmlString` deliberately bypasses
+encoding in attributes too: callers must ensure it is already safe inside
+double quotes, not merely safe as body markup. See the
+[attribute contract](../crates/razor-slices/ATTRIBUTES.md).
+
+Unsupported types fail type checking; neither `Display` nor synchronous
+`WriteHtmlValue` is an async fallback. Custom values opt into
+`AsyncWriteHtmlValue`, and custom conditional values additionally implement
+`AsyncAttributeValue` alongside the existing `AttributeValue` omission contract.
+Implementations own encoding/trust, bounded memory and awaited `Send` I/O;
+there is no arbitrary sync-value buffer, nested executor or hidden flush.
 
 Headers follow the existing [control-flow grammar](../crates/razor-slices/CONTROL_FLOW.md);
 parenthesize struct literals in conditions/iterators. Unsupported markup,
@@ -99,6 +129,33 @@ application completion count **before** notifying the later work to proceed.
 Both renders use the same template/model and create fresh awaited work.
 There is no sleep, hidden executor, buffering of a synchronous template, or
 spawn in generated code. Buffering the whole page would deadlock the handshake.
+
+## Mixed-value prefix-before-await fixture
+
+```shell
+cargo run -p razor-slices --example async_values --features tokio > target/async-values-output.txt
+diff -u crates/razor-slices/tests/fixtures/async_values.txt target/async-values-output.txt
+```
+
+Exact stdout:
+
+```text
+prefix-before-await: <h1 data-count="2" title="&lt;Values&gt;">&lt;Values&gt;true<b>trusted</b></h1>
+prefix-before-await: <h1 data-count="2" title="&lt;Values&gt;">&lt;Values&gt;true<b>trusted</b></h1>
+page: <h1 data-count="2" title="&lt;Values&gt;">&lt;Values&gt;true<b>trusted</b></h1>
+<button checked="checked" empty="" title="&lt;&amp;&quot;&#39;">2 -1.5 false</button>
+renders: 2
+```
+
+The [model/declaration](../crates/razor-slices/examples/support/async_values.rs)
+mixes encoded owned text, a numeric attribute, a body boolean and explicit
+trusted HTML before the first application await. The
+[executable](../crates/razor-slices/examples/async_values.rs) observes this entire
+prefix through an 8-byte duplex buffer, checks unchanged completion count,
+then notifies later work; it does this twice on the same template. The suffix
+verifies true/false/Option/empty-string attributes and body numeric/bool output.
+No sleeps are used. The same declaration is exercised over a real local HTTP/1
+connection by the Axum suite without changing the framework or original sample.
 
 ## Execution, errors and ownership
 
@@ -138,6 +195,13 @@ At pinned upstream
 - [`ExecuteAsync` / `FlushAsync`](https://github.com/DamianEdwards/RazorSlices/blob/552937e5f2f21ebcdc73939be014f3d217ffbb22/src/RazorSlices/RazorSlice.cs)
   execute application awaits against the active destination; [Streaming.cshtml](https://github.com/DamianEdwards/RazorSlices/blob/552937e5f2f21ebcdc73939be014f3d217ffbb22/samples/WebApp/Slices/Streaming.cshtml)
   explicitly flushes before later awaits.
+- [`PipeWriterHtmlExtensions`](https://github.com/DamianEdwards/RazorSlices/blob/552937e5f2f21ebcdc73939be014f3d217ffbb22/src/RazorSlices/PipeWriterHtmlExtensions.cs)
+  supplies primitive formatting and encoded text fast paths; this port reuses
+  its existing Rust representations and encoder rather than duplicating policy.
+- [`RazorSlice.HtmlAttributes`](https://github.com/DamianEdwards/RazorSlices/blob/552937e5f2f21ebcdc73939be014f3d217ffbb22/src/RazorSlices/RazorSlice.HtmlAttributes.cs)
+  suppresses null/false single values with empty prefixes and substitutes the
+  attribute name for true. The Rust adapter preserves this existing bounded
+  single-value subset, not the compound attribute state machine.
 
 This preserves those typed creation and ordered async execution capabilities
 within the [accepted inline proc-macro mechanism](https://github.com/davidfowl/razor-rust/issues/3#issuecomment-6132090066).

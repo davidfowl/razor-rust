@@ -29,8 +29,10 @@ use crate::{RenderError, Slice};
 
 mod incremental;
 mod sections;
+mod value;
 pub use incremental::{render_incremental, AsyncHtmlWriter, AsyncSlice};
 pub use sections::with_async_section;
+pub use value::AsyncWriteHtmlValue;
 
 /// A minimal, runtime-agnostic async byte sink used by streaming rendering.
 ///
