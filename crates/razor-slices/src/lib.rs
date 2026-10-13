@@ -11,6 +11,7 @@
 mod async_slice;
 mod html;
 mod inline;
+mod layout;
 mod partial;
 mod slice;
 
@@ -19,6 +20,7 @@ pub use async_slice::TokioWriter;
 pub use async_slice::{render_async, AsyncRenderError, AsyncSliceWriter};
 pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use inline::InlineSlice;
+pub use layout::{with_layout, Layout};
 pub use partial::{partial, Partial};
 pub use slice::{RenderError, Slice};
 

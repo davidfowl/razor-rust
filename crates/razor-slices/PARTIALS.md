@@ -105,7 +105,8 @@ no new DSL or implicit raw-output/type fallback was introduced, and this is not
 a claim of explicit maintainer approval of every API detail. Remaining work:
 model declarations/dedicated control-flow and conditional attributes
 [#3](https://github.com/davidfowl/razor-rust/issues/3), layouts/sections
-[#4](https://github.com/davidfowl/razor-rust/issues/4), async/context-aware partials
+[#4](https://github.com/davidfowl/razor-rust/issues/4) beyond the explicit
+synchronous [layout/body sample](LAYOUTS.md), async/context-aware partials
 [#5](https://github.com/davidfowl/razor-rust/issues/5), web integration
 [#6](https://github.com/davidfowl/razor-rust/issues/6), and true async streaming
 [#11](https://github.com/davidfowl/razor-rust/issues/11). This does not complete
