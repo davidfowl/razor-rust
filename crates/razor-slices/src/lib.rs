@@ -9,6 +9,7 @@
 //! tracking epic for overall project status: <https://github.com/davidfowl/razor-rust/issues/1>.
 
 mod async_slice;
+mod attribute;
 mod html;
 mod inline;
 mod layout;
@@ -22,6 +23,7 @@ pub use async_slice::{
     render_async, render_incremental, AsyncHtmlWriter, AsyncRenderError, AsyncSlice,
     AsyncSliceWriter,
 };
+pub use attribute::{attribute, Attribute, AttributeValue, InvalidAttributeName};
 pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use inline::InlineSlice;
 pub use layout::{declare_layout, with_layout, DeclaredLayout, Layout};
