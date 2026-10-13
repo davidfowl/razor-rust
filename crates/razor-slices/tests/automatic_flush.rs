@@ -7,8 +7,9 @@ use std::{
 };
 
 use razor_slices::{
-    async_template, attribute, declare_async_layout, render_incremental, with_async_section,
-    AsyncHtmlWriter, AsyncLayout, AsyncRenderError, AsyncSlice, AsyncSliceWriter, HtmlString,
+    async_template, attribute, declare_async_layout, render_incremental, with_async_layout,
+    with_async_section, AsyncHtmlWriter, AsyncLayout, AsyncRenderError, AsyncSlice,
+    AsyncSliceWriter, HtmlString,
 };
 
 const THRESHOLD: usize = 16_384;
@@ -449,4 +450,48 @@ fn nested_declared_layout_body_boundary_and_partial_bypass_repeat_exactly() {
     ready(out.write_slice(&page)).unwrap();
     assert!(state.lock().unwrap().bytes.ends_with(text.as_bytes()));
     assert_eq!(state.lock().unwrap().flushes.len(), 4);
+}
+
+#[test]
+fn completed_layout_flushes_after_its_body_remained_below_threshold() {
+    let text = "x".repeat(THRESHOLD - 2);
+    for explicit in [false, true] {
+        let state = Arc::new(Mutex::new(State::default()));
+        let mut writer = Writer(state.clone());
+        let mut out = AsyncHtmlWriter::new(&mut writer);
+        if explicit {
+            let page = with_async_layout(Literal::new(&text), Layout);
+            ready(out.write_slice(&page)).unwrap();
+        } else {
+            let page = declare_async_layout(Literal::new(&text), Layout);
+            ready(page.render_into(&mut out)).unwrap();
+        }
+        let state = state.lock().unwrap();
+        assert_eq!(state.bytes, format!("[{text}]").as_bytes());
+        assert_eq!(state.flushes, [THRESHOLD]);
+    }
+
+    let text = "x".repeat(THRESHOLD - 3);
+    let page = declare_async_layout(Literal::new(&text), declare_async_layout(Layout, Layout));
+    let state = Arc::new(Mutex::new(State::default()));
+    let mut writer = Writer(state.clone());
+    ready(render_incremental(&page, &mut writer)).unwrap();
+    let state = state.lock().unwrap();
+    assert_eq!(state.bytes, format!("[[{text}]]").as_bytes());
+    assert_eq!(state.flushes, [THRESHOLD, THRESHOLD + 1]);
+}
+
+#[test]
+fn layout_owned_section_child_auto_flushes_on_each_repeated_insertion() {
+    let text = "x".repeat(THRESHOLD);
+    let layout = with_async_section(Layout, "scripts", Literal::new(&text)).unwrap();
+    let state = Arc::new(Mutex::new(State::default()));
+    let mut writer = Writer(state.clone());
+    let mut out = AsyncHtmlWriter::new(&mut writer);
+    for _ in 0..2 {
+        ready(layout.render_layout_section_into(&Literal::new(""), "scripts", &mut out)).unwrap();
+    }
+    let state = state.lock().unwrap();
+    assert_eq!(state.bytes, text.repeat(2).as_bytes());
+    assert_eq!(state.flushes, [THRESHOLD, THRESHOLD * 2]);
 }
