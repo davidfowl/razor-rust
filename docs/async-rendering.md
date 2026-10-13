@@ -8,8 +8,10 @@ one flush. It does not expose bytes during template execution.
 contract. `render_incremental` calls `render_into` with a borrowed
 `AsyncHtmlWriter`, then awaits a final flush **only after success**.
 Implementations write/await/flush in source order, propagating failures with
-`?`; nested async slices can call `render_into` on the same output without
-an implicit final flush. This does not change synchronous templates or layouts,
+`?`; nested async slices can call `render_body_into` on the same output without
+an implicit final flush, bypassing declarations but retaining explicit layout
+composition. `render_into` deliberately selects full-document execution.
+This does not change synchronous templates or layouts,
 or require an executor in production default features. Generated typed
 declarations now use this contract through
 [`async_template!`](async-templates.md); synchronous `html!` stays unchanged.
@@ -48,9 +50,10 @@ Explicit lazy async sections are described in [async-sections.md](async-sections
 `with_async_section` associates reusable section renderers;
 `AsyncHtmlWriter::write_section` validates and awaits their execution at each
 insertion on the same destination. The `async_sections` example proves that a
-section's prefix is observable before its later await completes. This is
-separate from inherited/declarative layout context. Generated templates can
-insert explicit async sections using the grammar in [async-templates.md](async-templates.md).
+section's prefix is observable before its later await completes. Typed
+declarations and nested immediate-content section context are described in
+[async-layouts.md](async-layouts.md). Generated templates can insert explicit
+async sections using the grammar in [async-templates.md](async-templates.md).
 
 ## Errors, repetition and cancellation
 

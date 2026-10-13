@@ -21,10 +21,15 @@ pub trait AsyncLayout: Sync {
 
     /// Executes this layout's own named section for an outer layout.
     ///
-    /// Unknown nonempty names are optional; empty names are invalid. Explicit
-    /// associations via [`super::with_async_section`] retain this contract.
-    fn render_layout_section_into<W: AsyncSliceWriter + Send>(
+    /// Unknown nonempty names are optional; empty names are invalid. `body`
+    /// retains this layout's own immediate content context, even when the
+    /// section is inserted by an outer layout after rendering this layout's
+    /// body. A custom provider may explicitly dispatch a section on `body`;
+    /// there is no automatic recursive lookup. Associations via
+    /// [`super::with_async_section`] retain this contract.
+    fn render_layout_section_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
         &self,
+        _body: &B,
         name: &str,
         _output: &mut AsyncHtmlWriter<'_, W>,
     ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send {
@@ -41,12 +46,15 @@ impl<L: AsyncLayout + ?Sized> AsyncLayout for &L {
         (**self).render_layout_into(body, output).await
     }
 
-    async fn render_layout_section_into<W: AsyncSliceWriter + Send>(
+    async fn render_layout_section_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
         &self,
+        body: &B,
         name: &str,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
-        (**self).render_layout_section_into(name, output).await
+        (**self)
+            .render_layout_section_into(body, name, output)
+            .await
     }
 }
 
@@ -59,12 +67,15 @@ impl<L: AsyncLayout + ?Sized> AsyncLayout for Box<L> {
         (**self).render_layout_into(body, output).await
     }
 
-    async fn render_layout_section_into<W: AsyncSliceWriter + Send>(
+    async fn render_layout_section_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
         &self,
+        body: &B,
         name: &str,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
-        (**self).render_layout_section_into(name, output).await
+        (**self)
+            .render_layout_section_into(body, name, output)
+            .await
     }
 }
 
@@ -106,6 +117,66 @@ pub struct DeclaredAsyncLayout<S, L> {
 /// }
 /// fn accepts(_: &impl AsyncSlice) {}
 /// accepts(&declare_async_layout(html! { "sync" }, Layout));
+/// ```
+///
+/// A borrowed layout model cannot escape its lifetime:
+///
+/// ```compile_fail
+/// use razor_slices::{async_template, declare_async_layout, AsyncLayout, AsyncSlice,
+///     AsyncSliceWriter, AsyncHtmlWriter, AsyncRenderError};
+/// async_template! { struct Page { model: () } => { "body" } }
+/// struct Layout<'a>(&'a str);
+/// impl AsyncLayout for Layout<'_> {
+///     async fn render_layout_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
+///         &self, body: &B, out: &mut AsyncHtmlWriter<'_, W>,
+///     ) -> Result<(), AsyncRenderError> {
+///         out.write_value(self.0).await?;
+///         body.render_body_into(out).await
+///     }
+/// }
+/// let page;
+/// {
+///     let title = String::from("borrowed");
+///     page = declare_async_layout(Page::new(()), Layout(&title));
+/// }
+/// drop(page);
+/// ```
+///
+/// A typed generated body's model cannot escape either:
+///
+/// ```compile_fail
+/// use razor_slices::{async_template, declare_async_layout, AsyncLayout, AsyncSlice,
+///     AsyncSliceWriter, AsyncHtmlWriter, AsyncRenderError};
+/// async_template! { struct Page<'a> { model: &'a str } => { {model} } }
+/// struct Layout;
+/// impl AsyncLayout for Layout {
+///     async fn render_layout_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
+///         &self, body: &B, out: &mut AsyncHtmlWriter<'_, W>,
+///     ) -> Result<(), AsyncRenderError> { body.render_body_into(out).await }
+/// }
+/// let page;
+/// {
+///     let model = String::from("borrowed");
+///     page = declare_async_layout(Page::new(&model), Layout);
+/// }
+/// drop(page);
+/// ```
+///
+/// Layout awaits must produce Send futures:
+///
+/// ```compile_fail
+/// use razor_slices::{AsyncLayout, AsyncSlice, AsyncSliceWriter, AsyncHtmlWriter, AsyncRenderError};
+/// struct Layout;
+/// impl AsyncLayout for Layout {
+///     async fn render_layout_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
+///         &self, body: &B, out: &mut AsyncHtmlWriter<'_, W>,
+///     ) -> Result<(), AsyncRenderError> {
+///         let local = std::rc::Rc::new(String::from("local"));
+///         body.render_body_into(out).await?;
+///         out.write_value(&local).await?;
+///         Ok(())
+///     }
+/// }
 /// ```
 pub fn declare_async_layout<S, L: AsyncLayout>(body: S, layout: L) -> DeclaredAsyncLayout<S, L> {
     DeclaredAsyncLayout { body, layout }
@@ -150,12 +221,15 @@ impl<S: AsyncLayout, L: AsyncLayout> AsyncLayout for DeclaredAsyncLayout<S, L> {
         self.layout.render_layout_into(&content, output).await
     }
 
-    async fn render_layout_section_into<W: AsyncSliceWriter + Send>(
+    async fn render_layout_section_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
         &self,
+        body: &B,
         name: &str,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
-        self.body.render_layout_section_into(name, output).await
+        self.body
+            .render_layout_section_into(body, name, output)
+            .await
     }
 }
 
@@ -203,7 +277,9 @@ impl<L: AsyncLayout, B: AsyncSlice> AsyncSlice for LayoutContent<'_, L, B> {
         name: &str,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
-        self.layout.render_layout_section_into(name, output).await
+        self.layout
+            .render_layout_section_into(&Body(self.body), name, output)
+            .await
     }
 }
 

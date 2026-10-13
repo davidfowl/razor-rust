@@ -14,6 +14,8 @@ use super::{AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter};
 /// Owns both slices (or their references) and copies the name. Empty names fail
 /// at construction with [`io::ErrorKind::InvalidInput`]. Unknown nonempty names
 /// write nothing by default. Borrowed models must outlive their renderers.
+/// The body may also be an [`super::AsyncLayout`]; the returned association
+/// retains that typed contract and supplies its own sections to outer layouts.
 ///
 /// ```
 /// use razor_slices::{
@@ -133,8 +135,9 @@ impl<S: super::AsyncLayout, T: AsyncSlice> super::AsyncLayout for AsyncSectioned
         self.body.render_layout_into(body, output).await
     }
 
-    async fn render_layout_section_into<W: AsyncSliceWriter + Send>(
+    async fn render_layout_section_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
         &self,
+        body: &B,
         name: &str,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
@@ -142,7 +145,9 @@ impl<S: super::AsyncLayout, T: AsyncSlice> super::AsyncLayout for AsyncSectioned
         if name == self.name {
             self.content.render_body_into(output).await
         } else {
-            self.body.render_layout_section_into(name, output).await
+            self.body
+                .render_layout_section_into(body, name, output)
+                .await
         }
     }
 }

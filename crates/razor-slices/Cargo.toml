@@ -37,3 +37,7 @@ required-features = ["tokio"]
 [[example]]
 name = "async_template"
 required-features = ["tokio"]
+
+[[example]]
+name = "async_layout"
+required-features = ["tokio"]

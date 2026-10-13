@@ -35,8 +35,10 @@ handshake. No sleeps, detached tasks or timing-based assumptions are used.
 
 ## Contract
 
-`with_async_section(body, name, content) -> io::Result<impl AsyncSlice>` owns
-the two async slices (or their references) and copies the name. Construction
+`with_async_section(body, name, content) -> io::Result<AsyncSectioned<S, T>>` owns
+the body and async content (or their references) and copies the name. The body
+can be a slice or a typed async layout; the association retains that contract.
+Construction
 does not execute either renderer. Ordinary `render_into` delegates unchanged
 to the body. Section dispatch executes only a matching section's body;
 otherwise it delegates to the wrapped body's sections. Chain associations
@@ -69,7 +71,7 @@ Empty rendering requests fail with that I/O error inside
 providers must also reject empty names. Unknown nonempty names write/flush
 nothing by default, even if the destination would fail a write.
 
-Static `&S` and `Box<S>` providers forward ordinary and section execution;
+Static `&S` and `Box<S>` providers forward full, bare-body and section execution;
 this does not make `AsyncSlice` object-safe. Model/reference lifetimes follow
 Rust borrowing; association names may be dropped after construction.
 The existing `AsyncSlice: Sync` and writer `Send` bounds remain in force and
@@ -109,10 +111,10 @@ contradictory XML comment describing a missing-section exception.
 No Razor `@section` directive is introduced, consistent with upstream's
 intentional streaming-compatible manual section overrides.
 
-This is explicit async composition, not a new async layout trait or inherited
-ambient context. Generated/declarative nested layout context remains
-[#47](https://github.com/davidfowl/razor-rust/issues/47)/
-[#36](https://github.com/davidfowl/razor-rust/issues/36).
+The original #48 delivery is explicit async composition. This follow-up source
+also supports typed async declarations and render-local immediate-content
+section context in [async-layouts.md](async-layouts.md) (#64/PR #65), not shared
+ambient context. Broader synchronous provider context remains #66/#47.
 Generated typed async declarations and explicit section insertion are covered in
 [async-templates.md](async-templates.md) ([#58](https://github.com/davidfowl/razor-rust/issues/58)
 under [#3](https://github.com/davidfowl/razor-rust/issues/3)); HTTP

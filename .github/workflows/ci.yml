@@ -74,6 +74,13 @@ jobs:
           cargo run -p razor-slices --example async_template --features tokio > target/async-template-output.txt
           diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
 
+      - name: Verify nested async layout section handshake and bare partial stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run --locked -p razor-slices --example async_layout --features tokio > target/async-layout-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_layout.txt target/async-layout-output.txt
+          cat target/async-layout-output.txt
+
   docs:
     runs-on: ubuntu-latest
     strategy:
@@ -148,3 +155,6 @@ jobs:
           diff -u crates/razor-slices/tests/fixtures/async_sections.txt target/async-sections-output.txt
           cargo run -p razor-slices --example async_template --features tokio > target/async-template-output.txt
           diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
+          cargo run --locked -p razor-slices --example async_layout --features tokio > target/async-layout-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_layout.txt target/async-layout-output.txt
+          cat target/async-layout-output.txt

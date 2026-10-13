@@ -37,7 +37,9 @@ do not duplicate work already in progress.
   then calls the destination's `write_all` and `flush`. It is an async I/O
   bridge, not incremental mid-template streaming. The separate `AsyncSlice`,
   `AsyncHtmlWriter` and `render_incremental` path writes incrementally and
-  supports mid-template flush and explicit lazy async sections.
+  supports mid-template flush, lazy async sections and typed declared/nested
+  async layouts with immediate-content section context. Async child/section
+  execution bypasses declared layouts, but retains explicit composition.
 - `AsyncSliceWriter` is runtime-agnostic. The default-off `tokio` feature adds
   `TokioWriter`; the core has no mandatory async-runtime dependency. Tokio is
   also a dev-dependency for tests, which does not make the adapter available
@@ -62,8 +64,9 @@ do not duplicate work already in progress.
   renderer and bounded frames, with no spawned producer.
 - This integration preview assembles unmerged deliveries, not a released
   full port. Broader generated value/grammar parity remains tracked in
-  [#3](https://github.com/davidfowl/razor-rust/issues/3); inherited/async layout
-  context, request lifetime and broader parity remain #47/#52/#11.
+  [#3](https://github.com/davidfowl/razor-rust/issues/3); synchronous nested
+  section context remains #66 and broader layout/request lifetime parity
+  remains #47/#52/#11. Typed async context is documented in docs/async-layouts.md.
   See [docs/integration.md](docs/integration.md) for exact source dependencies.
   Do not turn a proposed ADR or issue example into an accepted public API
   decision. Later owner-delegated reversible implementation choices do not

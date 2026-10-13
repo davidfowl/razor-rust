@@ -27,7 +27,8 @@ rendering — without pulling in a full web/MVC framework.
   agnostic way to write a rendered `Slice` to a destination (e.g. an
   HTTP response body). It calls `render_to_bytes`, including any override,
   before writing and flushing the complete buffer. The separate `AsyncSlice`
-  path writes incrementally, supports explicit flush and lazy async sections,
+  path writes incrementally, supports explicit flush, lazy async sections and
+  typed declared/nested layouts with immediate-content section context,
   and honors destination backpressure without a full-page buffer. No async
   runtime is a mandatory dependency; enable the default-off `tokio` Cargo
   feature for a ready-made `tokio::io::AsyncWrite` adapter (`TokioWriter`).
@@ -72,6 +73,9 @@ cargo run --locked -p razor-slices --example async_sections --features tokio
 # Generate a typed reusable async template; observe its prefix on both renders:
 cargo run --locked -p razor-slices --example async_template --features tokio
 
+# Nested declared async layouts and sections, followed by the bare partial:
+cargo run --locked -p razor-slices --example async_layout --features tokio
+
 # Actual HTTP streaming; release the held page from another terminal:
 cargo run --locked -p razor-slices-axum --example streaming_server
 curl --no-buffer -i http://127.0.0.1:3000/stream
@@ -86,6 +90,7 @@ is open. Servers run locally; no hosted preview or deployment is provided.
 | Model, control flow, attributes, layout, sections and bare partial | [Integrated example](crates/razor-slices/examples/integration.rs), [exact output](crates/razor-slices/tests/fixtures/integration.html), [integration guide](docs/integration.md) |
 | Incremental rendering and async sections | [Async rendering](docs/async-rendering.md), [section handshake](docs/async-sections.md) |
 | Generated typed async templates | [Grammar, ownership and actual prefix handshake](docs/async-templates.md) |
+| Declared/nested async layouts and bare partial | [Immediate-content sections, handshake and exact output](docs/async-layouts.md) |
 | Atomic buffered HTTP response | [Axum sample](crates/razor-slices-axum/README.md) |
 | Bounded streaming HTTP response | [Server, commands and transport limits](crates/razor-slices-axum/STREAMING.md) |
 
@@ -97,8 +102,10 @@ is open. Servers run locally; no hosted preview or deployment is provided.
   [PR #59](https://github.com/davidfowl/razor-rust/pull/59) are included here;
   initial async interpolation accepts strings, not all synchronous value types
   ([focused parity #62](https://github.com/davidfowl/razor-rust/issues/62)).
-- [#47](https://github.com/davidfowl/razor-rust/issues/47): inherited and async
-  layout/section context beyond explicit associations.
+- [#47](https://github.com/davidfowl/razor-rust/issues/47): broader layout
+  lifecycle parity and [synchronous nested provider context #66](https://github.com/davidfowl/razor-rust/issues/66).
+  Typed async declarations/context from [#64 / PR #65](https://github.com/davidfowl/razor-rust/pull/65)
+  are included in this follow-up source, still unmerged.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /
   [#52](https://github.com/davidfowl/razor-rust/issues/52): remaining request
   context, portable response-start, lifecycle/flush and encoder-policy parity.

@@ -84,7 +84,12 @@ Reserved ADR reconciliation #28/#29 is not overwritten. Current source
 instructions and README describe the assembled code, not historical
 scaffolding.
 
-Inherited/async layout context remains #47. Request context/tokens, portable
+This follow-up source adds typed async declarations and immediate-content
+layout/section context in [#64 / PR #65](https://github.com/davidfowl/razor-rust/pull/65);
+see [async-layouts.md](async-layouts.md) for exact full/partial output and its
+observable section handshake. Synchronous nested provider context remains
+[#66](https://github.com/davidfowl/razor-rust/issues/66), with broader layout
+lifecycle in #47. The #61 source heads above remain frozen. Request context/tokens, portable
 explicit response-start, lifecycle/threshold-flush and broader encoder policy
 remain #52/#11. Proxy/HTTP2 behavior and complete .NET parity are not inferred
 from local HTTP/1 tests. Broader benchmark parity remains #8.
