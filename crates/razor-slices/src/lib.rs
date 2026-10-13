@@ -20,8 +20,9 @@ mod slice;
 #[cfg(feature = "tokio")]
 pub use async_slice::TokioWriter;
 pub use async_slice::{
-    render_async, render_incremental, with_async_section, AsyncHtmlWriter, AsyncRenderError,
-    AsyncSlice, AsyncSliceWriter, AsyncWriteHtmlValue,
+    render_async, render_incremental, render_incremental_with_context, with_async_section,
+    AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter, AsyncWriteHtmlValue,
+    CancellationToken, RenderCancelled, RenderContext,
 };
 pub use attribute::{
     attribute, AsyncAttributeValue, Attribute, AttributeValue, InvalidAttributeName,

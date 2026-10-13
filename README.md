@@ -39,6 +39,11 @@ rendering — without pulling in a full web/MVC framework.
   strings/references, explicit trusted `HtmlString` and conditional attributes.
   Built-ins use fixed encoding/format scratch; custom values must explicitly
   implement `AsyncWriteHtmlValue`, not just `Display` or `WriteHtmlValue`.
+- Opt-in typed, borrowed request models and cooperative cancellation scopes.
+  Shared output carries the token through children/sections; cancellation
+  interrupts held awaits/writes with an observable error, not successful EOF.
+  Axum additionally signals its dedicated token on unfinished body drop.
+  See [request context and transport limits](docs/request-context.md).
 - Byte-oriented, low-allocation HTML encoding: `encode_html_to_writer` writes
   UTF-8 directly to any `std::io::Write` sink (no intermediate `String`), and
   `WriteHtmlValue` formats numbers/bools into a stack buffer instead of
@@ -79,6 +84,9 @@ cargo run --locked -p razor-slices --example async_template --features tokio
 # Mixed typed values, trusted HTML and conditional attributes before later work:
 cargo run --locked -p razor-slices --example async_values --features tokio
 
+# Reuse typed request data twice, then cancel during a held application await:
+cargo run --locked -p razor-slices --example request_context --features tokio
+
 # Actual HTTP streaming; release the held page from another terminal:
 cargo run --locked -p razor-slices-axum --example streaming_server
 curl --no-buffer -i http://127.0.0.1:3000/stream
@@ -93,6 +101,7 @@ is open. Servers run locally; no hosted preview or deployment is provided.
 | Model, control flow, attributes, layout, sections and bare partial | [Integrated example](crates/razor-slices/examples/integration.rs), [exact output](crates/razor-slices/tests/fixtures/integration.html), [integration guide](docs/integration.md) |
 | Incremental rendering and async sections | [Async rendering](docs/async-rendering.md), [section handshake](docs/async-sections.md) |
 | Generated typed async templates | [Grammar, ownership and actual prefix handshake](docs/async-templates.md) |
+| Typed request scope and cooperative cancellation | [Runnable sample, exact output and portable/transport contract](docs/request-context.md) |
 | Atomic buffered HTTP response | [Axum sample](crates/razor-slices-axum/README.md) |
 | Bounded streaming HTTP response | [Server, commands and transport limits](crates/razor-slices-axum/STREAMING.md) |
 
@@ -110,7 +119,9 @@ is open. Servers run locally; no hosted preview or deployment is provided.
   layout/section context beyond explicit associations.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /
   [#52](https://github.com/davidfowl/razor-rust/issues/52): remaining request
-  context, portable response-start, lifecycle/flush and encoder-policy parity.
+  metadata/service injection, portable response-start, lifecycle/flush and
+  encoder-policy parity. Bounded request models/tokens are covered by
+  [#67](https://github.com/davidfowl/razor-rust/issues/67).
 - [#8](https://github.com/davidfowl/razor-rust/issues/8): broader samples and
   comparable benchmarks. Integration success is not complete .NET parity.
 

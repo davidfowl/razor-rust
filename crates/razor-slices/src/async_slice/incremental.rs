@@ -2,7 +2,9 @@
 
 use std::{future::Future, io};
 
-use super::{AsyncRenderError, AsyncSliceWriter, AsyncWriteHtmlValue};
+use super::{
+    AsyncRenderError, AsyncSliceWriter, AsyncWriteHtmlValue, CancellationToken, RenderContext,
+};
 use crate::encode_html_to_writer;
 
 /// A reusable template that writes output while awaiting work in template order.
@@ -91,19 +93,66 @@ impl<S: AsyncSlice + ?Sized> AsyncSlice for Box<S> {
 /// [`Self::flush`] requests visibility according to the sink's own contract.
 pub struct AsyncHtmlWriter<'a, W> {
     writer: &'a mut W,
+    cancellation: Option<&'a CancellationToken>,
 }
 
 impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
     /// Borrows the destination without taking ownership or closing it.
     pub fn new(writer: &'a mut W) -> Self {
-        Self { writer }
+        Self {
+            writer,
+            cancellation: None,
+        }
+    }
+
+    /// Borrows the destination and a shared cancellation scope.
+    ///
+    /// Writes/flushes observe cancellation, including while pending. For
+    /// cancellation during application awaits use
+    /// [`render_incremental_with_context`] or [`CancellationToken::run`] around
+    /// the entire execution, not this constructor alone.
+    ///
+    /// The token must outlive its output borrow:
+    ///
+    /// ```compile_fail
+    /// use razor_slices::{AsyncHtmlWriter, AsyncSliceWriter, CancellationToken};
+    /// struct Writer;
+    /// impl AsyncSliceWriter for Writer {
+    ///     async fn write_all(&mut self, _: &[u8]) -> std::io::Result<()> { Ok(()) }
+    ///     async fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+    /// }
+    /// let mut writer = Writer;
+    /// let output;
+    /// {
+    ///     let token = CancellationToken::new();
+    ///     output = AsyncHtmlWriter::with_cancellation(&mut writer, &token);
+    /// }
+    /// drop(output);
+    /// ```
+    pub fn with_cancellation(writer: &'a mut W, cancellation: &'a CancellationToken) -> Self {
+        Self {
+            writer,
+            cancellation: Some(cancellation),
+        }
+    }
+
+    /// Returns the same scope token in pages, children and sections.
+    ///
+    /// Legacy unscoped writers return `None`. Application operations may clone
+    /// this token and explicitly participate without borrowing the writer.
+    pub fn cancellation_token(&self) -> Option<&CancellationToken> {
+        self.cancellation
     }
 
     /// Writes trusted literal markup without escaping.
     ///
     /// Do not use this for untrusted model values; use [`Self::write_value`].
     pub async fn write_literal(&mut self, literal: &str) -> io::Result<()> {
-        self.writer.write_all(literal.as_bytes()).await
+        let write = self.writer.write_all(literal.as_bytes());
+        match self.cancellation {
+            Some(token) => token.run(write).await,
+            None => write.await,
+        }
     }
 
     /// Writes a string value, escaping `&`, `<`, `>`, `"`, and `'`.
@@ -122,7 +171,11 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
             let mut buffer = io::Cursor::new(scratch.as_mut_slice());
             encode_html_to_writer(chunk, &mut buffer)?;
             let len = buffer.position() as usize;
-            self.writer.write_all(&scratch[..len]).await?;
+            let write = self.writer.write_all(&scratch[..len]);
+            match self.cancellation {
+                Some(token) => token.run(write).await?,
+                None => write.await?,
+            }
             value = rest;
         }
         Ok(())
@@ -156,7 +209,11 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
 
     /// Awaits a mid-template flush, propagating backpressure and failure.
     pub async fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush().await
+        let flush = self.writer.flush();
+        match self.cancellation {
+            Some(token) => token.run(flush).await,
+            None => flush.await,
+        }
     }
 }
 
@@ -167,7 +224,8 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
 /// Writer or template errors return immediately: there is no success fallback,
 /// retry, rollback, or final flush after an error.
 ///
-/// Cancellation is by dropping this future, not a built-in cancellation token.
+/// This legacy entry point cancels by dropping its future. For an observable
+/// cooperative token, use [`render_incremental_with_context`].
 /// A pending write may already have accepted a prefix, depending on the sink;
 /// do not restart a cancelled render on the same destination expecting atomic
 /// output. Cancellation of application awaits is their responsibility. The
@@ -181,4 +239,54 @@ pub async fn render_incremental(
     slice.render_into(&mut output).await?;
     output.flush().await?;
     Ok(())
+}
+
+/// Executes with immutable typed request data and an observable cancellation scope.
+///
+/// Bind the context through the slice's typed model when it needs request data.
+/// The shared output automatically propagates the token to nested slices and
+/// sections without adding a generic parameter to existing template contracts.
+/// The scope races the entire execution (including held application awaits)
+/// and each destination write/flush against cancellation.
+///
+/// Returns [`AsyncRenderError::Write`] containing an `Interrupted` I/O error
+/// with [`super::RenderCancelled`] source. Original destination/template errors
+/// are otherwise unchanged. No suffix or final flush runs after cancellation.
+/// Partial writes are not rolled back; the caller still owns the destination.
+/// A cancelled token stays cancelled across repeated renders.
+///
+/// ```compile_fail
+/// use razor_slices::{
+///     async_template, render_incremental_with_context, AsyncSliceWriter,
+///     CancellationToken, RenderContext,
+/// };
+/// async_template! { struct Page { model: () } => { "page" } }
+/// struct Writer;
+/// impl AsyncSliceWriter for Writer {
+///     async fn write_all(&mut self, _: &[u8]) -> std::io::Result<()> { Ok(()) }
+///     async fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+/// }
+/// let page = Page::new(());
+/// let mut writer = Writer;
+/// let render;
+/// {
+///     let context = RenderContext::new((), CancellationToken::new());
+///     render = render_incremental_with_context(&page, &mut writer, &context);
+/// }
+/// drop(render);
+/// ```
+pub async fn render_incremental_with_context<T: Sync>(
+    slice: &(impl AsyncSlice + ?Sized),
+    writer: &mut (impl AsyncSliceWriter + Send),
+    context: &RenderContext<T>,
+) -> Result<(), AsyncRenderError> {
+    let token = context.cancellation_token();
+    token
+        .run(async {
+            let mut output = AsyncHtmlWriter::with_cancellation(writer, token);
+            slice.render_into(&mut output).await?;
+            output.flush().await?;
+            Ok(())
+        })
+        .await
 }

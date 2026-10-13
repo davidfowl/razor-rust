@@ -13,7 +13,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use futures_core::Stream;
-use razor_slices::{render_incremental, AsyncRenderError, AsyncSlice, AsyncSliceWriter};
+use razor_slices::{
+    render_incremental_with_context, AsyncRenderError, AsyncSlice, AsyncSliceWriter,
+    CancellationToken, RenderContext,
+};
 use tokio::sync::mpsc;
 
 const FRAME_SIZE: usize = 1_024;
@@ -32,6 +35,9 @@ const FRAME_SIZE: usize = 1_024;
 ///
 /// Dropping the body stops polling its render/application futures. Accepted
 /// bytes are not rolled back; independently spawned work is not cancelled.
+/// A dedicated cooperative token also signals unfinished body drop; explicit
+/// application cancellation emits a body error. See
+/// [`Self::with_cancellation_token`] for scope ownership and request data.
 /// Sink acceptance/explicit flush makes frames available, not a guarantee that
 /// a client/socket received them. Panics are not caught.
 ///
@@ -77,6 +83,7 @@ const FRAME_SIZE: usize = 1_024;
 pub struct StreamingSliceResponse<S> {
     slice: S,
     status: StatusCode,
+    cancellation: CancellationToken,
 }
 
 impl<S: AsyncSlice + Send + 'static> StreamingSliceResponse<S> {
@@ -85,6 +92,7 @@ impl<S: AsyncSlice + Send + 'static> StreamingSliceResponse<S> {
         Self {
             slice,
             status: StatusCode::OK,
+            cancellation: CancellationToken::new(),
         }
     }
 
@@ -97,18 +105,45 @@ impl<S: AsyncSlice + Send + 'static> StreamingSliceResponse<S> {
         self.status = status;
         self
     }
+
+    /// Uses a dedicated application request token for this response.
+    ///
+    /// Explicit cancellation becomes an observable body error, not successful
+    /// EOF. Unfinished body drop also cancels this token, so do not share it
+    /// between independent requests. Typed request data remains in the owned
+    /// slice/model (for example an `Arc<RenderContext<T>>`), not implicit Axum
+    /// request/service injection. Independently spawned work must observe the
+    /// token itself; its task is not aborted.
+    pub fn with_cancellation_token(mut self, cancellation: CancellationToken) -> Self {
+        self.cancellation = cancellation;
+        self
+    }
+
+    /// Borrows the response's dedicated scope token before body conversion.
+    pub fn cancellation_token(&self) -> &CancellationToken {
+        &self.cancellation
+    }
 }
 
 impl<S: AsyncSlice + Send + 'static> IntoResponse for StreamingSliceResponse<S> {
     fn into_response(self) -> Response {
-        let Self { slice, status } = self;
+        let Self {
+            slice,
+            status,
+            cancellation,
+        } = self;
         let (sender, receiver) = mpsc::channel(1);
         let mut writer = OutputWriter(sender);
-        let rendering = Box::pin(async move { render_incremental(&slice, &mut writer).await });
+        let scope = RenderContext::new((), cancellation.clone());
+        let rendering =
+            Box::pin(
+                async move { render_incremental_with_context(&slice, &mut writer, &scope).await },
+            );
         let stream = OutputStream {
             receiver,
             rendering: Some(rendering),
             error: None,
+            cancellation,
         };
         (
             status,
@@ -150,6 +185,15 @@ struct OutputStream {
     receiver: mpsc::Receiver<Bytes>,
     rendering: Option<Rendering>,
     error: Option<AsyncRenderError>,
+    cancellation: CancellationToken,
+}
+
+impl Drop for OutputStream {
+    fn drop(&mut self) {
+        if self.rendering.is_some() {
+            self.cancellation.cancel();
+        }
+    }
 }
 
 impl Stream for OutputStream {

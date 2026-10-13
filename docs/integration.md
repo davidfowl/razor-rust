@@ -12,6 +12,13 @@ follow-up starts from frozen #61 head
 It targets main with all unmerged dependencies below; none of the source
 branches are modified by the follow-up.
 
+The isolated [#67 / PR #68](https://github.com/davidfowl/razor-rust/pull/68)
+request-scope follow-up starts from verified Ready/unmerged #63 at
+`43056c1cc10f96c92cdfd0c04aeec42b745024c3`. It adds opt-in typed request
+models/cooperative tokens and Axum scope notification without changing #63
+or frozen #61. Separate #65 async layout dispatch is **not** included;
+[#69](https://github.com/davidfowl/razor-rust/issues/69) tracks that assembly gap.
+
 ## Exact source deliveries
 
 | PR | Head | Scope |
@@ -92,7 +99,9 @@ Reserved ADR reconciliation #28/#29 is not overwritten. Current source
 instructions and README describe the assembled code, not historical
 scaffolding.
 
-Inherited/async layout context remains #47. Request context/tokens, portable
+Inherited/async layout context remains #47/#65. Bounded typed request models
+and cooperative cancellation are documented in [request-context.md](request-context.md).
+Automatic request metadata/service injection, portable
 explicit response-start, lifecycle/threshold-flush and broader encoder policy
 remain #52/#11. Proxy/HTTP2 behavior and complete .NET parity are not inferred
 from local HTTP/1 tests. Broader benchmark parity remains #8.

@@ -27,10 +27,14 @@ use std::io;
 
 use crate::{RenderError, Slice};
 
+mod context;
 mod incremental;
 mod sections;
 mod value;
-pub use incremental::{render_incremental, AsyncHtmlWriter, AsyncSlice};
+pub use context::{CancellationToken, RenderCancelled, RenderContext};
+pub use incremental::{
+    render_incremental, render_incremental_with_context, AsyncHtmlWriter, AsyncSlice,
+};
 pub use sections::with_async_section;
 pub use value::AsyncWriteHtmlValue;
 

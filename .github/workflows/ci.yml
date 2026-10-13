@@ -80,6 +80,13 @@ jobs:
           cargo run -p razor-slices --example async_values --features tokio > target/async-values-output.txt
           diff -u crates/razor-slices/tests/fixtures/async_values.txt target/async-values-output.txt
 
+      - name: Verify request context, repeat rendering and cancellation stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run -p razor-slices --example request_context --features tokio > target/request-context-output.txt
+          cat target/request-context-output.txt
+          diff -u crates/razor-slices/tests/fixtures/request_context.txt target/request-context-output.txt
+
   docs:
     runs-on: ubuntu-latest
     strategy:
@@ -156,3 +163,6 @@ jobs:
           diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
           cargo run -p razor-slices --example async_values --features tokio > target/async-values-output.txt
           diff -u crates/razor-slices/tests/fixtures/async_values.txt target/async-values-output.txt
+          cargo run -p razor-slices --example request_context --features tokio > target/request-context-output.txt
+          cat target/request-context-output.txt
+          diff -u crates/razor-slices/tests/fixtures/request_context.txt target/request-context-output.txt

@@ -21,6 +21,7 @@ do not duplicate work already in progress.
 | [src/slice.rs](crates/razor-slices/src/slice.rs) | Synchronous `Slice`, render errors, reference/box implementations, and unit tests |
 | [src/html.rs](crates/razor-slices/src/html.rs) | Shared HTML encoding, `HtmlString`, `WriteHtmlValue`, and unit tests |
 | [src/async_slice.rs](crates/razor-slices/src/async_slice.rs) | Async writer trait, buffered rendering bridge, optional Tokio adapter, and tests |
+| [src/async_slice/context.rs](crates/razor-slices/src/async_slice/context.rs) | Typed request data, runtime-agnostic token and observable cancellation |
 | [src/async_slice/value.rs](crates/razor-slices/src/async_slice/value.rs) | Explicit async interpolation contract, strings, booleans and trusted HTML; numeric fast paths share `html.rs` buffers |
 | [src/attribute.rs](crates/razor-slices/src/attribute.rs) | Shared validated conditional attributes with explicit sync/async value contracts |
 | [examples/async_values.rs](crates/razor-slices/examples/async_values.rs) | Generated mixed-value model, reusable prefix-before-await handshake and exact stdout |
@@ -66,6 +67,9 @@ do not duplicate work already in progress.
   clean 500 responses; streaming failures propagate body errors after selected
   headers and cannot replace already-started responses. The body owns its
   renderer and bounded frames, with no spawned producer.
+  Dedicated cancellation tokens are signalled on unfinished body drop; explicit
+  cancellation is a body error. Core request data remains explicit typed model
+  input, not automatic framework/service injection. See docs/request-context.md.
 - This integration preview assembles unmerged deliveries, not a released
   full port. Broader generated value/grammar parity remains tracked in
   [#3](https://github.com/davidfowl/razor-rust/issues/3); inherited/async layout
