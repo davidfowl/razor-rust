@@ -105,6 +105,16 @@ headers. Use the unchanged buffered `SliceResponse` if atomic error responses
 are required. Outer status tuples/middleware can intentionally override
 response headers/status, as with other Axum responses.
 
+On the tested local Axum/Hyper HTTP/1 path, response headers also arrive
+while the renderer awaits application work **before its first write**.
+Two real TCP tests hold that work, receive/assert status 201, the HTML content
+type and chunked transfer encoding, then release rendering. The successful
+case returns exactly `&lt;世界&gt;`; the failing case instead fails the
+already-started transfer, without a replacement 500 or clean empty body.
+There is no initial body prefix or explicit flush driving this handshake.
+This is a transport-specific regression guarantee, not an explicit
+`StartAsync` API or promise about middleware, proxy or HTTP/2 buffering.
+
 Dropping the body drops the renderer and stops polling its application awaits,
 including while a write is backpressured. There is no producer task to leak
 or restart. Bytes already accepted are not rolled back and independently
@@ -136,8 +146,9 @@ The HTTP suite preserves all buffered response regressions and adds streaming
 lazy start, selected status/content type, prefix-before-await, original-source
 error/logging, early failure, empty EOF, bounded Unicode frames/slow consumers,
 drop cancellation, HEAD without execution, an actual TCP HTTP/1 release
-handshake, and real peer disconnects during application and destination
-awaits. Workspace stable/MSRV/default/all-features CI executes the suite;
+handshake, real peer disconnects during application and destination awaits,
+and empty-prefix header commitment followed by success or failure.
+Workspace stable/MSRV/default/all-features CI executes the suite;
 existing buffered server smoke coverage remains intact.
 
 Grounded in pinned upstream
@@ -146,7 +157,8 @@ and the streaming sample at
 [`552937e5f2f21ebcdc73939be014f3d217ffbb22`](https://github.com/DamianEdwards/RazorSlices/tree/552937e5f2f21ebcdc73939be014f3d217ffbb22).
 Upstream selects/starts the response before async rendering and final flush.
 This adapter likewise separates selected headers from asynchronous body
-execution, without claiming identical forced-start/PipeWriter semantics.
+execution. Its real HTTP/1 tests additionally demonstrate headers before
+the first write, without claiming identical forced-start/PipeWriter semantics.
 It preserves streaming order and post-start failure rather than buffered
 500 replacement.
 
@@ -155,7 +167,9 @@ disposal and broader .NET encoder policy remain
 [#11](https://github.com/davidfowl/razor-rust/issues/11).
 Real disconnect regression coverage is tracked by
 [#54](https://github.com/davidfowl/razor-rust/issues/54);
-request context and forced empty-prefix response commitment remain
+empty-prefix HTTP/1 response commitment is tracked by
+[#56](https://github.com/davidfowl/razor-rust/issues/56).
+Request context/tokens and a portable explicit response-start API remain
 [#52](https://github.com/davidfowl/razor-rust/issues/52).
 Generated async templates remain [#3](https://github.com/davidfowl/razor-rust/issues/3);
 inherited layout/section context remains

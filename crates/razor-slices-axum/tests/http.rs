@@ -694,6 +694,105 @@ async fn real_peer_disconnect_cancels_pending_destination_write() {
     real_peer_disconnect(true).await;
 }
 
+struct HeldBeforeOutput {
+    suspended: Arc<tokio::sync::Notify>,
+    release: Arc<tokio::sync::Notify>,
+    completed: Arc<AtomicUsize>,
+    fail: bool,
+}
+
+impl AsyncSlice for HeldBeforeOutput {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        self.suspended.notify_one();
+        self.release.notified().await;
+        self.completed.fetch_add(1, Ordering::SeqCst);
+        if self.fail {
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, OriginalError).into());
+        }
+        output.write_value("<世界>").await?;
+        Ok(())
+    }
+}
+
+async fn real_http_empty_prefix_commitment(fail: bool) {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let suspended = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let completed = Arc::new(AtomicUsize::new(0));
+        let captured_suspended = suspended.clone();
+        let captured_release = release.clone();
+        let captured_completed = completed.clone();
+        let app = Router::new().route(
+            "/",
+            get(move || {
+                let page = HeldBeforeOutput {
+                    suspended: captured_suspended.clone(),
+                    release: captured_release.clone(),
+                    completed: captured_completed.clone(),
+                    fail,
+                };
+                async move { StreamingSliceResponse::new(page).with_status(StatusCode::CREATED) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let _server = AbortOnDrop(tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        }));
+        let (mut client, connection) = http_client(address).await;
+        let mut connection = AbortOnDrop(connection);
+        let response = client
+            .send_request(
+                Request::builder()
+                    .uri("/")
+                    .header("host", address.to_string())
+                    .body(Empty::new())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(
+            response.headers()["content-type"],
+            "text/html; charset=utf-8"
+        );
+        assert_eq!(response.headers()["transfer-encoding"], "chunked");
+        suspended.notified().await;
+        assert_eq!(completed.load(Ordering::SeqCst), 0);
+        release.notify_one();
+        let output = response.into_body().collect().await;
+        if fail {
+            assert!(
+                output.is_err(),
+                "post-header failure must fail the transfer, not return clean EOF or error HTML"
+            );
+        } else {
+            assert_eq!(output.unwrap().to_bytes(), "&lt;世界&gt;".as_bytes());
+        }
+        assert_eq!(completed.load(Ordering::SeqCst), 1);
+        connection.0.abort();
+        match (&mut connection.0).await {
+            Err(error) => assert!(error.is_cancelled()),
+            Ok(result) => result.unwrap(),
+        }
+    })
+    .await
+    .expect("HTTP/1 headers must arrive before releasing empty-prefix rendering");
+}
+
+#[tokio::test]
+async fn real_http_headers_arrive_before_first_output_and_later_success() {
+    real_http_empty_prefix_commitment(false).await;
+}
+
+#[tokio::test]
+async fn real_http_failure_after_empty_prefix_headers_is_not_a_replacement_500() {
+    real_http_empty_prefix_commitment(true).await;
+}
+
 #[tokio::test]
 async fn real_http_prefix_is_received_before_separate_release_request_and_exact_suffix() {
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
