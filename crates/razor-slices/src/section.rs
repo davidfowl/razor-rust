@@ -68,6 +68,7 @@ impl<S: Slice> WriteHtmlValue for Section<'_, S> {
 /// otherwise delegating to the body's sections. Associations can be chained;
 /// the outermost association wins when names repeat. Repeated insertion renders
 /// the section again, with no caching or exactly-once restriction.
+/// Associated content bypasses declared layouts, retaining explicit composition.
 ///
 /// Owns both slices (or their references) and the name. Empty names fail at
 /// construction with [`io::ErrorKind::InvalidInput`]. No `@section` syntax,
@@ -127,10 +128,14 @@ impl<S: Slice, T: Slice> Slice for Sectioned<S, T> {
         self.body.render_to_writer(writer)
     }
 
+    fn render_body_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.body.render_body_to_writer(writer)
+    }
+
     fn render_section_to_writer(&self, name: &str, writer: &mut dyn io::Write) -> io::Result<()> {
         validate_name(name)?;
         if name == self.name {
-            self.content.render_to_writer(writer)
+            self.content.render_body_to_writer(writer)
         } else {
             self.body.render_section_to_writer(name, writer)
         }

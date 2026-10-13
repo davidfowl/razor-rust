@@ -57,6 +57,8 @@ jobs:
           diff -u crates/razor-slices/tests/fixtures/layout.html target/layout-output.html
           cargo run -p razor-slices --example sections > target/sections-output.html
           diff -u crates/razor-slices/tests/fixtures/sections.html target/sections-output.html
+          cargo run -p razor-slices --example declared_layout > target/declared-layout-output.html
+          diff -u crates/razor-slices/tests/fixtures/declared-layout.html target/declared-layout-output.html
 
   docs:
     runs-on: ubuntu-latest

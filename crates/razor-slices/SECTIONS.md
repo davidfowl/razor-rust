@@ -138,9 +138,11 @@ explicit maintainer approval.
 Each explicit layout dispatches to its own supplied body. A composed
 `with_layout` document does not implicitly inherit the body's section provider.
 To expose sections to an outer layout, explicitly associate sections on the
-inner document; nested sections remain scoped to their own bodies. Generated
-declarative layout association and automatic declared-layout bypass remain
-[#36](https://github.com/davidfowl/razor-rust/issues/36).
+inner document; nested sections remain scoped to their own bodies.
+[Typed declared layouts](DECLARED-LAYOUTS.md), delivered for
+[#36](https://github.com/davidfowl/razor-rust/issues/36), preserve body section
+dispatch and bypass declarations when rendering associated section content.
+Generated declaration syntax remains in #3.
 Inherited/async section context, cancellation and lifecycle parity have focused
 follow-up [#47](https://github.com/davidfowl/razor-rust/issues/47) under #4, alongside
 [#11](https://github.com/davidfowl/razor-rust/issues/11); the existing async

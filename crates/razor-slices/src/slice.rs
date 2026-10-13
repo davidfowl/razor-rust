@@ -66,6 +66,16 @@ pub trait Slice {
         }
     }
 
+    /// Renders this slice as a child, bypassing any declared layout.
+    ///
+    /// The default preserves ordinary byte-rendering overrides and explicit
+    /// [`crate::with_layout`] composition. Declaration wrappers override this
+    /// method; partials, layout bodies and section content use it directly.
+    /// Does not buffer, flush, or change the original I/O error.
+    fn render_body_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.render_to_writer(writer)
+    }
+
     /// Renders a named section directly to a byte writer at its insertion point.
     ///
     /// Names are nonempty and case-sensitive. The default writes nothing for
@@ -112,6 +122,18 @@ impl<S: Slice + ?Sized> Slice for &S {
         (**self).render_to_writer(writer)
     }
 
+    fn render_body_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).render_body_to_writer(writer)
+    }
+
+    fn render_to_string(&self) -> Result<String, RenderError> {
+        (**self).render_to_string()
+    }
+
+    fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+        (**self).render_to_bytes()
+    }
+
     fn render_section_to_writer(&self, name: &str, writer: &mut dyn io::Write) -> io::Result<()> {
         (**self).render_section_to_writer(name, writer)
     }
@@ -124,6 +146,18 @@ impl<S: Slice + ?Sized> Slice for Box<S> {
 
     fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         (**self).render_to_writer(writer)
+    }
+
+    fn render_body_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).render_body_to_writer(writer)
+    }
+
+    fn render_to_string(&self) -> Result<String, RenderError> {
+        (**self).render_to_string()
+    }
+
+    fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+        (**self).render_to_bytes()
     }
 
     fn render_section_to_writer(&self, name: &str, writer: &mut dyn io::Write) -> io::Result<()> {

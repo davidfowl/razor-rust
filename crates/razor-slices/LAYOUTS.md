@@ -96,9 +96,11 @@ The association here is an explicit Rust composition constructor, not generated
 `IUsesLayout` metadata or automatic layout discovery. A composed document is a
 normal `Slice`: explicitly passing it to `partial` includes that layout.
 Upstream child rendering disables a child's declared layout. For equivalent
-bare-body partial usage here, pass the body before `with_layout`; automatic
-declared-layout bypass has focused follow-up
-[#36](https://github.com/davidfowl/razor-rust/issues/36) under #4.
+bare-body partial usage with explicit composition, pass the body before
+`with_layout`. The separate [typed declaration API](DECLARED-LAYOUTS.md)
+delivered for [#36](https://github.com/davidfowl/razor-rust/issues/36) applies
+layouts at root rendering and bypasses them automatically for partial/body
+execution, while preserving explicit composition.
 There is no optional missing body: use an empty slice deliberately.
 
 Explicit lazy synchronous named sections are described in [SECTIONS.md](SECTIONS.md)
