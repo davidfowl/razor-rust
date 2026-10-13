@@ -9,11 +9,13 @@
 //! tracking epic for overall project status: <https://github.com/davidfowl/razor-rust/issues/1>.
 
 mod async_slice;
+mod attribute;
 mod html;
 mod slice;
 
 #[cfg(feature = "tokio")]
 pub use async_slice::TokioWriter;
 pub use async_slice::{render_async, AsyncRenderError, AsyncSliceWriter};
+pub use attribute::{attribute, Attribute, AttributeValue, InvalidAttributeName};
 pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use slice::{RenderError, Slice};
