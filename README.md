@@ -34,6 +34,11 @@ rendering — without pulling in a full web/MVC framework.
   runtime is a mandatory dependency; enable the default-off `tokio` Cargo
   feature for a ready-made `tokio::io::AsyncWrite` adapter (`TokioWriter`).
   See [#11](https://github.com/davidfowl/razor-rust/issues/11).
+- Completed incremental children/layouts automatically flush at **16,384
+  unflushed output bytes**, matching pinned upstream's inclusive slice-completion
+  boundary, not each write or arbitrary await. Plain sections are not boundaries.
+  [Threshold contract and no-manual-flush sample](docs/async-rendering.md#automatic-completion-flush)
+  are tracked in bounded [#72 / PR #73](https://github.com/davidfowl/razor-rust/pull/73).
 - Axum adapters for atomic buffered HTML responses and bounded incremental
   streaming responses, with runnable servers and real HTTP/1 regressions
   for prefix delivery, peer-disconnect cancellation and post-start failures.
@@ -87,6 +92,9 @@ cargo run --locked -p razor-slices --example async_layout --features tokio
 # Both features together: borrowed/owned models, repeated documents and partials:
 cargo run --locked -p razor-slices --example combined_async --features tokio
 
+# No manual flush: a completed child publishes 16,384 bytes before held work:
+cargo run --locked -p razor-slices --example automatic_flush --features tokio
+
 # Actual HTTP streaming; release the held page from another terminal:
 cargo run --locked -p razor-slices-axum --example streaming_server
 curl --no-buffer -i http://127.0.0.1:3000/stream
@@ -123,6 +131,9 @@ is open. Servers run locally; no hosted preview or deployment is provided.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /
   [#52](https://github.com/davidfowl/razor-rust/issues/52): remaining request
   context, portable response-start, lifecycle/flush and encoder-policy parity.
+  Automatic completion flush is isolated on frozen #71; combining request
+  scope #68 with declared layouts remains separately owned
+  [#69](https://github.com/davidfowl/razor-rust/issues/69), not included here.
 - [#8](https://github.com/davidfowl/razor-rust/issues/8): broader samples and
   comparable benchmarks. Integration success is not complete .NET parity.
 

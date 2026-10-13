@@ -51,7 +51,7 @@ Every body (including nested branches/loops) accepts:
 | `@await { future };` | Await a unit-returning application future |
 | `@await { future }?;` | Await a unit-result future and propagate its convertible error |
 | `@flush;` | Await a flush at this exact insertion point |
-| `@render { child };` | Execute a bare `AsyncSlice` on the same writer, bypassing declared layouts but retaining explicit composition, without an implicit flush |
+| `@render { child };` | Execute a bare `AsyncSlice` on the same writer, bypassing declared layouts but retaining explicit composition; check the 16,384-byte completion auto-flush threshold |
 | `@section { provider }, { name };` | Await explicit lazy section lookup/rendering on the same writer |
 
 Await directives deliberately require `()` (or `Result<(), E>` with `?`):
@@ -215,6 +215,6 @@ in [async-layouts.md](async-layouts.md) (#64/PR #65); broader synchronous contex
 and lifecycle remain #66/#47. Explicit sections use
 [async-sections.md](async-sections.md). Framework response lifecycle stays
 [#52](https://github.com/davidfowl/razor-rust/issues/52)/[#56](https://github.com/davidfowl/razor-rust/issues/56).
-Cancellation tokens, threshold flushes, local-only writers and async trait
+Cancellation tokens, native pipe accounting/flags, local-only writers and async trait
 objects remain #11. Historical ADR reconciliation stays #28/PR #29.
 No epic or whole-port landing is claimed.

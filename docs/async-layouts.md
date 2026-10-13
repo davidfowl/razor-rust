@@ -93,6 +93,11 @@ accepted bytes are not rolled back. Dropping the render future drops in-flight
 awaits and stops polling, but cannot cancel separately spawned work or undo
 destination-accepted prefixes. The writer stays caller-owned.
 
+This source additionally checks the inclusive 16,384 unflushed-byte threshold
+at successful body/child/layout completion. Plain section dispatch does not
+auto-flush. See the [exact completion contract](async-rendering.md#automatic-completion-flush);
+small-output fixtures and existing explicit flushes remain unchanged.
+
 ## Executable upstream grounding and known gaps
 
 At pinned upstream
@@ -113,7 +118,7 @@ At pinned upstream
 **Known gaps / follow-ups:** synchronous nested provider context is separately
 tracked in [#66](https://github.com/davidfowl/razor-rust/issues/66); it is not
 silently fixed or claimed here. #47/#11/#52 retain initialization/disposal,
-request tokens/context, completion flags and automatic-flush/encoder-policy
+request tokens/context, native pipe completion/accounting and encoder-policy
 parity. #3 retains broader grammar/value parity; #62/#63 remains independently
 delivered. Async trait objects/local-only futures are not added. Fresh Rust
 renders re-execute borrowed templates rather than reproducing C# pooling or

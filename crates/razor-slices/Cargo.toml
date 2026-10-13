@@ -49,3 +49,7 @@ required-features = ["tokio"]
 [[example]]
 name = "combined_async"
 required-features = ["tokio"]
+
+[[example]]
+name = "automatic_flush"
+required-features = ["tokio"]

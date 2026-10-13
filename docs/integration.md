@@ -139,6 +139,14 @@ unchanged and executable.
 
 ## Remaining work
 
+Bounded [#72 / PR #73](https://github.com/davidfowl/razor-rust/pull/73)
+adds automatic 16,384-byte **completed-slice** flush to frozen #71 at
+`0e4c49a8e7cab4061d56964709fbd55bc6fb2788`. It does not combine request scope
+#68; separately owned #69 remains the request-context/layout integration
+dependency. The existing preview and its exact fixtures remain intact.
+See [automatic completion acceptance](async-rendering.md#automatic-completion-flush)
+for executable buffered-sink and real HTTP evidence and native-pipe limits.
+
 Typed generated async templates from verified Ready #58/#59 are included.
 Focused [#62](https://github.com/davidfowl/razor-rust/issues/62) under #3/#2/#11
 adds bounded primitive, trusted-HTML and conditional attribute interpolation
@@ -155,7 +163,7 @@ see [async-layouts.md](async-layouts.md) for exact full/partial output and its
 observable section handshake. Synchronous nested provider context remains
 [#66](https://github.com/davidfowl/razor-rust/issues/66), with broader layout
 lifecycle in #47. The #61 source heads above remain frozen. Request context/tokens, portable
-explicit response-start, lifecycle/threshold-flush and broader encoder policy
+explicit response-start, native-pipe lifecycle/accounting and broader encoder policy
 remain #52/#11. The separately delivered #68 request-scope source is not part
 of this pinned assembly; combined token/layout acceptance remains focused #69,
 not a tested claim here. Proxy/HTTP2 behavior and complete .NET parity are not inferred

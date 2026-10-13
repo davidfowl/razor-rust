@@ -120,7 +120,7 @@ Generated typed async declarations and explicit section insertion are covered in
 under [#3](https://github.com/davidfowl/razor-rust/issues/3)); HTTP
 streaming/cancellation integration remains
 [#6](https://github.com/davidfowl/razor-rust/issues/6).
-Writer lifetime/token/completion/threshold-flush parity and broader .NET
+Writer lifetime/token/native-pipe completion parity and broader .NET
 encoder policy remain [#11](https://github.com/davidfowl/razor-rust/issues/11).
 The original buffered synchronous bridge is unchanged. This is not a claim
 of full-port/integrated-stack completeness or explicit maintainer API approval:

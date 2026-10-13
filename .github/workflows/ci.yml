@@ -94,6 +94,12 @@ jobs:
           diff -u crates/razor-slices/tests/fixtures/combined_async.txt target/combined-async-output.txt
           cat target/combined-async-output.txt
 
+      - name: Verify automatic completed-child flush and exact stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run --locked -p razor-slices --example automatic_flush --features tokio > target/automatic-flush-output.txt
+          diff -u crates/razor-slices/tests/fixtures/automatic_flush.txt target/automatic-flush-output.txt
+
   docs:
     runs-on: ubuntu-latest
     strategy:
@@ -176,3 +182,5 @@ jobs:
           cargo run --locked -p razor-slices --example combined_async --features tokio > target/combined-async-output.txt
           diff -u crates/razor-slices/tests/fixtures/combined_async.txt target/combined-async-output.txt
           cat target/combined-async-output.txt
+          cargo run --locked -p razor-slices --example automatic_flush --features tokio > target/automatic-flush-output.txt
+          diff -u crates/razor-slices/tests/fixtures/automatic_flush.txt target/automatic-flush-output.txt

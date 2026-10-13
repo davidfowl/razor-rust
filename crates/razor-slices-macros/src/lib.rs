@@ -204,7 +204,7 @@ fn generate_parts(
         }
         Part::Flush => quote! { #writer.flush().await?; },
         Part::Render(child) => quote! {
-            #runtime::AsyncSlice::render_body_into(&(#child), #writer).await?;
+            #writer.write_slice(&(#child)).await?;
         },
         Part::Section { provider, name } => quote! {
             #writer.write_section(&(#provider), &(#name)).await?;

@@ -119,7 +119,7 @@ impl<S: AsyncSlice, T: AsyncSlice> AsyncSlice for AsyncSectioned<S, T> {
     ) -> Result<(), AsyncRenderError> {
         validate_name(name)?;
         if name == self.name {
-            self.content.render_body_into(output).await
+            output.write_slice(&self.content).await
         } else {
             self.body.render_section_into(name, output).await
         }
@@ -143,7 +143,7 @@ impl<S: super::AsyncLayout, T: AsyncSlice> super::AsyncLayout for AsyncSectioned
     ) -> Result<(), AsyncRenderError> {
         validate_name(name)?;
         if name == self.name {
-            self.content.render_body_into(output).await
+            output.write_slice(&self.content).await
         } else {
             self.body
                 .render_layout_section_into(body, name, output)

@@ -7,8 +7,9 @@ use super::{AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter};
 /// A reusable async layout around a statically typed content slice.
 ///
 /// Insert `body` with [`AsyncSlice::render_body_into`] and its optional sections
-/// with [`AsyncHtmlWriter::write_section`]. Neither operation buffers or adds a
-/// flush. Declared outer layouts see this layout's sections, not a recursive
+/// with [`AsyncHtmlWriter::write_section`]. Neither operation buffers. A supplied
+/// body's successful completion checks auto-flush; plain sections do not.
+/// Declared outer layouts see this layout's sections, not a recursive
 /// search through the original body's sections, matching upstream ContentSlice.
 /// Implementations must await writes and propagate failures.
 pub trait AsyncLayout: Sync {
@@ -189,7 +190,11 @@ impl<S: AsyncSlice, L: AsyncLayout> AsyncSlice for DeclaredAsyncLayout<S, L> {
     ) -> Result<(), AsyncRenderError> {
         self.layout
             .render_layout_into(&Body(&self.body), output)
-            .await
+            .await?;
+        if output.should_auto_flush() {
+            output.flush().await?;
+        }
+        Ok(())
     }
 
     async fn render_body_into<W: AsyncSliceWriter + Send>(
@@ -218,7 +223,11 @@ impl<S: AsyncLayout, L: AsyncLayout> AsyncLayout for DeclaredAsyncLayout<S, L> {
             layout: &self.body,
             body,
         };
-        self.layout.render_layout_into(&content, output).await
+        self.layout.render_layout_into(&content, output).await?;
+        if output.should_auto_flush() {
+            output.flush().await?;
+        }
+        Ok(())
     }
 
     async fn render_layout_section_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
@@ -253,7 +262,11 @@ impl<S: AsyncSlice, L: AsyncLayout> AsyncSlice for ExplicitLayout<S, L> {
     ) -> Result<(), AsyncRenderError> {
         self.layout
             .render_layout_into(&Body(&self.body), output)
-            .await
+            .await?;
+        if output.should_auto_flush() {
+            output.flush().await?;
+        }
+        Ok(())
     }
 }
 
@@ -269,7 +282,11 @@ impl<L: AsyncLayout, B: AsyncSlice> AsyncSlice for LayoutContent<'_, L, B> {
     ) -> Result<(), AsyncRenderError> {
         self.layout
             .render_layout_into(&Body(self.body), output)
-            .await
+            .await?;
+        if output.should_auto_flush() {
+            output.flush().await?;
+        }
+        Ok(())
     }
 
     async fn render_section_into<W: AsyncSliceWriter + Send>(
@@ -290,7 +307,11 @@ impl<S: AsyncSlice + ?Sized> AsyncSlice for Body<'_, S> {
         &self,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
-        self.0.render_body_into(output).await
+        self.0.render_body_into(output).await?;
+        if output.should_auto_flush() {
+            output.flush().await?;
+        }
+        Ok(())
     }
 
     async fn render_section_into<W: AsyncSliceWriter + Send>(

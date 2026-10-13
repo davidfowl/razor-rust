@@ -45,6 +45,10 @@ do not duplicate work already in progress.
   supports mid-template flush, lazy async sections and typed declared/nested
   async layouts with immediate-content section context. Async child/section
   execution bypasses declared layouts, but retains explicit composition.
+  Generated children, `AsyncHtmlWriter::write_slice`, supplied layout bodies and
+  completed layouts check the inclusive 16,384 accepted-output-byte threshold.
+  Writes/arbitrary awaits/plain sections do not auto-flush. Root final flush
+  and explicit flush remain unchanged; request scope #68/#69 is not assembled.
 - `AsyncSliceWriter` is runtime-agnostic. The default-off `tokio` feature adds
   `TokioWriter`; the core has no mandatory async-runtime dependency. Tokio is
   also a dev-dependency for tests, which does not make the adapter available

@@ -19,6 +19,8 @@ use razor_slices_axum::{SliceResponse, StreamingSliceResponse};
 use tower::ServiceExt;
 use tracing::instrument::WithSubscriber;
 
+#[path = "../../razor-slices/examples/support/automatic_flush.rs"]
+mod automatic_flush;
 #[path = "../examples/support/combined.rs"]
 mod combined;
 #[path = "../../razor-slices/examples/support/async_values.rs"]
@@ -27,6 +29,78 @@ mod generated_values;
 mod page;
 #[path = "../examples/support/streaming.rs"]
 mod streaming_sample;
+
+#[tokio::test]
+async fn real_http_completed_child_automatic_prefix_before_release_and_exact_output() {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let release = Arc::new(tokio::sync::Notify::new());
+        let completed = Arc::new(AtomicUsize::new(0));
+        let captured_release = release.clone();
+        let captured_completed = completed.clone();
+        let app = Router::new().route(
+            "/",
+            get(move || {
+                let page = automatic_flush::SectionPage::new(automatic_flush::section_page(
+                    automatic_flush::Model::new(
+                        captured_release.clone(),
+                        captured_completed.clone(),
+                    ),
+                ));
+                async move { StreamingSliceResponse::new(page) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let _server = AbortOnDrop(tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        }));
+        for round in 0..2 {
+            let (mut client, connection) = http_client(address).await;
+            let mut connection = AbortOnDrop(connection);
+            let response = client
+                .send_request(
+                    Request::builder()
+                        .uri("/")
+                        .header("host", address.to_string())
+                        .body(Empty::new())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.headers()["content-type"],
+                "text/html; charset=utf-8"
+            );
+            let mut body = response.into_body();
+            let mut prefix = Vec::new();
+            while prefix.len() < automatic_flush::PREFIX_BYTES {
+                prefix.extend(body.frame().await.unwrap().unwrap().into_data().unwrap());
+            }
+            assert_eq!(prefix, vec![b'x'; automatic_flush::PREFIX_BYTES]);
+            assert_eq!(completed.load(Ordering::SeqCst), round);
+            release.notify_one();
+            prefix.extend(body.collect().await.unwrap().to_bytes());
+            assert_eq!(
+                prefix,
+                format!(
+                    "{}{}",
+                    "x".repeat(automatic_flush::PREFIX_BYTES),
+                    automatic_flush::SUFFIX
+                )
+                .as_bytes()
+            );
+            assert_eq!(completed.load(Ordering::SeqCst), round + 1);
+            connection.0.abort();
+            match (&mut connection.0).await {
+                Err(error) => assert!(error.is_cancelled()),
+                Ok(result) => result.unwrap(),
+            }
+        }
+    })
+    .await
+    .expect("automatic completed-child prefix must arrive before held await release");
+}
 
 async fn body(response: axum::response::Response) -> Vec<u8> {
     response

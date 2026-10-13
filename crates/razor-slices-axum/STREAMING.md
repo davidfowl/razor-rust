@@ -176,7 +176,7 @@ the first write, without claiming identical forced-start/PipeWriter semantics.
 It preserves streaming order and post-start failure rather than buffered
 500 replacement.
 
-Request cancellation tokens, writer completion flags/threshold flush,
+Request cancellation tokens, native writer completion/accounting flags,
 disposal and broader .NET encoder policy remain
 [#11](https://github.com/davidfowl/razor-rust/issues/11).
 Real disconnect regression coverage is tracked by
