@@ -9,8 +9,10 @@ contract. `render_incremental` calls `render_into` with a borrowed
 `AsyncHtmlWriter`, then awaits a final flush **only after success**.
 Implementations write/await/flush in source order, propagating failures with
 `?`; nested async slices can call `render_into` on the same output without
-an implicit final flush. This does not change synchronous templates, macro
-grammar, layouts, or require an executor in production default features.
+an implicit final flush. This does not change synchronous templates or layouts,
+or require an executor in production default features. Generated typed
+declarations now use this contract through
+[`async_template!`](async-templates.md); synchronous `html!` stays unchanged.
 
 ## Observable example
 
@@ -47,7 +49,8 @@ Explicit lazy async sections are described in [async-sections.md](async-sections
 `AsyncHtmlWriter::write_section` validates and awaits their execution at each
 insertion on the same destination. The `async_sections` example proves that a
 section's prefix is observable before its later await completes. This is
-separate from inherited/declarative layout context and generated async syntax.
+separate from inherited/declarative layout context. Generated templates can
+insert explicit async sections using the grammar in [async-templates.md](async-templates.md).
 
 ## Errors, repetition and cancellation
 
@@ -90,13 +93,15 @@ Upstream auto-flushes pipes at a 16 KiB threshold and disposes slice instances;
 this reusable Rust path instead final-flushes unconditionally on success and
 leaves the destination caller-owned. It does not interpret `PipeWriter`
 completion/cancellation flags, provide cancellation tokens, implement the
-default C# encoder's broader Unicode allow-list, or add generated `@await`
-syntax/HTTP response integration.
+default C# encoder's broader Unicode allow-list, or add HTTP response integration.
+Generated declarations and explicit awaits are covered separately in
+[async-templates.md](async-templates.md).
 
 Delivery is tracked in [#37](https://github.com/davidfowl/razor-rust/issues/37)
 under [#11](https://github.com/davidfowl/razor-rust/issues/11). Remaining
 runtime cancellation/flush/encoder parity stays under #11; generated async
-templates stay under [#3](https://github.com/davidfowl/razor-rust/issues/3)
+templates are delivered by [#58](https://github.com/davidfowl/razor-rust/issues/58)
+under [#3](https://github.com/davidfowl/razor-rust/issues/3)
 and HTTP integration under [#6](https://github.com/davidfowl/razor-rust/issues/6).
 
 The executable integration tests deliberately hold template work, writes and

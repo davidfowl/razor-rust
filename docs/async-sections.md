@@ -113,8 +113,9 @@ This is explicit async composition, not a new async layout trait or inherited
 ambient context. Generated/declarative nested layout context remains
 [#47](https://github.com/davidfowl/razor-rust/issues/47)/
 [#36](https://github.com/davidfowl/razor-rust/issues/36).
-Generated async template/model syntax remains
-[#3](https://github.com/davidfowl/razor-rust/issues/3); HTTP
+Generated typed async declarations and explicit section insertion are covered in
+[async-templates.md](async-templates.md) ([#58](https://github.com/davidfowl/razor-rust/issues/58)
+under [#3](https://github.com/davidfowl/razor-rust/issues/3)); HTTP
 streaming/cancellation integration remains
 [#6](https://github.com/davidfowl/razor-rust/issues/6).
 Writer lifetime/token/completion/threshold-flush parity and broader .NET

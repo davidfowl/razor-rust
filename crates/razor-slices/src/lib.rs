@@ -1,7 +1,7 @@
 //! Core runtime for Razor Slices: lightweight, high-performance templates for Rust.
 //!
 //! This crate provides the [`Slice`] trait and supporting types used by generated
-//! template code (see [`html!`])
+//! template code (see [`html!`] and [`async_template!`])
 //! to render templates with low allocations.
 //!
 //! This is the runtime half of the port of
@@ -33,6 +33,53 @@ pub use slice::{RenderError, Slice};
 
 #[doc(hidden)]
 pub use razor_slices_macros::html as __html;
+
+#[doc(hidden)]
+pub use razor_slices_macros::async_template as __async_template;
+
+/// Declares a reusable, model-typed [`AsyncSlice`] executed in template order.
+///
+/// Declares exactly one named `model` field and generates `new(model)` with the
+/// struct's visibility. Each render borrows that field as `model`; it does not
+/// consume the model or cache futures/output. Lifetime/type parameters and
+/// where clauses are ordinary Rust. The model must be `Sync`, and all awaited
+/// work must produce a `Send` render future.
+///
+/// String literals are trusted markup; `{ expression }` escapes string values
+/// with the bounded [`AsyncHtmlWriter::write_value`] path. Nested `if`/`for`
+/// use the same grammar as [`html!`]. Async-only directives:
+///
+/// - `@{ Rust statements }` introduces render-local bindings/work (including await).
+/// - `@await { future };` awaits unit output; `@await { future }?;` propagates
+///   errors from a unit-result future. Value-producing awaits use Rust bindings.
+/// - `@flush;` awaits an explicit flush at that insertion point.
+/// - `@render { child };` executes an async child on the same writer.
+/// - `@section { provider }, { name };` inserts an explicit lazy async section.
+///
+/// No directive implicitly buffers, spawns, or flushes after a child. Only
+/// [`render_incremental`] adds a final flush on success. Unlike synchronous
+/// interpolation, values must coerce to `&str`; format numbers explicitly.
+/// See `docs/async-templates.md` and `examples/async_template.rs`.
+///
+/// ```
+/// use razor_slices::{async_template, AsyncSlice};
+/// async_template! {
+///     pub struct Greeting<'a> { model: &'a str } => {
+///         "<p>" {model} "</p>"
+///         @flush;
+///         @await { async {} };
+///     }
+/// }
+/// let template = Greeting::new("<World>");
+/// fn is_async(_: &impl AsyncSlice) {}
+/// is_async(&template);
+/// ```
+#[macro_export]
+macro_rules! async_template {
+    ($($template:tt)*) => {
+        $crate::__async_template! { ($crate) $($template)* }
+    };
+}
 
 /// Creates a reusable synchronous [`Slice`] from literal markup and values.
 ///
