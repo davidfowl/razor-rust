@@ -85,6 +85,12 @@ cargo build --workspace
 cargo test --workspace
 ```
 
+## Contributing
+
+See [AGENTS.md](AGENTS.md) for repository structure, current implementation
+boundaries, development checks, and contribution conventions for human and AI
+contributors.
+
 ## Credits
 
 Architecture and API surface are directly inspired by
