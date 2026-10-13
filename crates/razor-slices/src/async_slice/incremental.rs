@@ -2,7 +2,7 @@
 
 use std::{future::Future, io};
 
-use super::{AsyncRenderError, AsyncSliceWriter};
+use super::{AsyncRenderError, AsyncSliceWriter, AsyncWriteHtmlValue};
 use crate::encode_html_to_writer;
 
 /// A reusable template that writes output while awaiting work in template order.
@@ -126,6 +126,17 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
             value = rest;
         }
         Ok(())
+    }
+
+    /// Writes an explicitly supported typed value without buffering or flushing.
+    ///
+    /// This is the generated interpolation path. [`Self::write_value`] remains
+    /// the string-only encoding API, including its existing coercions.
+    pub async fn write_html_value(
+        &mut self,
+        value: &(impl AsyncWriteHtmlValue + ?Sized),
+    ) -> io::Result<()> {
+        value.write_html_async(self).await
     }
 
     /// Executes a named section on the same output without buffering or flushing.

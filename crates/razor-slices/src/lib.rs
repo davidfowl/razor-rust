@@ -21,9 +21,11 @@ mod slice;
 pub use async_slice::TokioWriter;
 pub use async_slice::{
     render_async, render_incremental, with_async_section, AsyncHtmlWriter, AsyncRenderError,
-    AsyncSlice, AsyncSliceWriter,
+    AsyncSlice, AsyncSliceWriter, AsyncWriteHtmlValue,
 };
-pub use attribute::{attribute, Attribute, AttributeValue, InvalidAttributeName};
+pub use attribute::{
+    attribute, AsyncAttributeValue, Attribute, AttributeValue, InvalidAttributeName,
+};
 pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use inline::InlineSlice;
 pub use layout::{declare_layout, with_layout, DeclaredLayout, Layout};
@@ -45,8 +47,9 @@ pub use razor_slices_macros::async_template as __async_template;
 /// where clauses are ordinary Rust. The model must be `Sync`, and all awaited
 /// work must produce a `Send` render future.
 ///
-/// String literals are trusted markup; `{ expression }` escapes string values
-/// with the bounded [`AsyncHtmlWriter::write_value`] path. Nested `if`/`for`
+/// String literals are trusted markup; `{ expression }` uses the bounded typed
+/// [`AsyncWriteHtmlValue`] path: escaped strings, primitives, explicit trusted
+/// [`HtmlString`] and validated [`attribute()`] adapters. Nested `if`/`for`
 /// use the same grammar as [`html!`]. Async-only directives:
 ///
 /// - `@{ Rust statements }` introduces render-local bindings/work (including await).
@@ -58,7 +61,7 @@ pub use razor_slices_macros::async_template as __async_template;
 ///
 /// No directive implicitly buffers, spawns, or flushes after a child. Only
 /// [`render_incremental`] adds a final flush on success. Unlike synchronous
-/// interpolation, values must coerce to `&str`; format numbers explicitly.
+/// interpolation, custom values must implement the explicit async contract.
 /// See `docs/async-templates.md` and `examples/async_template.rs`.
 ///
 /// ```

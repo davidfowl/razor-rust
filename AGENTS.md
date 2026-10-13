@@ -21,6 +21,9 @@ do not duplicate work already in progress.
 | [src/slice.rs](crates/razor-slices/src/slice.rs) | Synchronous `Slice`, render errors, reference/box implementations, and unit tests |
 | [src/html.rs](crates/razor-slices/src/html.rs) | Shared HTML encoding, `HtmlString`, `WriteHtmlValue`, and unit tests |
 | [src/async_slice.rs](crates/razor-slices/src/async_slice.rs) | Async writer trait, buffered rendering bridge, optional Tokio adapter, and tests |
+| [src/async_slice/value.rs](crates/razor-slices/src/async_slice/value.rs) | Explicit async interpolation contract, strings, booleans and trusted HTML; numeric fast paths share `html.rs` buffers |
+| [src/attribute.rs](crates/razor-slices/src/attribute.rs) | Shared validated conditional attributes with explicit sync/async value contracts |
+| [examples/async_values.rs](crates/razor-slices/examples/async_values.rs) | Generated mixed-value model, reusable prefix-before-await handshake and exact stdout |
 | [examples/hello.rs](crates/razor-slices/examples/hello.rs) | Runnable hand-written `Slice` demo |
 | [examples/html_encode_bench.rs](crates/razor-slices/examples/html_encode_bench.rs) | Existing HTML encoder microbenchmark |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | Stable and MSRV CI, with default/all-features coverage |
@@ -49,8 +52,11 @@ do not duplicate work already in progress.
   error propagation when working here.
 - Inline `html!` generates reusable slices with nested conditionals/loops.
   `async_template!` generates model-typed reusable `AsyncSlice` declarations
-  with explicit await/flush, child and section directives. Initial async
-  interpolation accepts strings, not all `WriteHtmlValue` types.
+  with explicit await/flush, child and section directives. Typed async
+  interpolation supports the existing bool/numeric families, strings/references,
+  trusted `HtmlString` and conditional attribute adapters. Custom values require
+  `AsyncWriteHtmlValue` (attributes also require `AsyncAttributeValue`); never
+  buffer arbitrary synchronous values or infer safety from `Display`.
   Partials, conditional attributes, layouts and named sections are implemented
   in this source. Declared layouts bypass full-document rendering when used
   as children, but explicitly composed documents remain composed. Preserve

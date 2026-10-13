@@ -1,0 +1,5 @@
+prefix-before-await: <h1 data-count="2" title="&lt;Values&gt;">&lt;Values&gt;true<b>trusted</b></h1>
+prefix-before-await: <h1 data-count="2" title="&lt;Values&gt;">&lt;Values&gt;true<b>trusted</b></h1>
+page: <h1 data-count="2" title="&lt;Values&gt;">&lt;Values&gt;true<b>trusted</b></h1>
+<button checked="checked" empty="" title="&lt;&amp;&quot;&#39;">2 -1.5 false</button>
+renders: 2

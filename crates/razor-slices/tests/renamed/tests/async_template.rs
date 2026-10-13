@@ -5,7 +5,11 @@ extern crate std;
 
 slices::async_template! {
     pub struct Renamed<'a> { model: &'a str } => {
-        "prefix" {model}
+        "prefix" {model} {42u32} {false}
+        {<slices::HtmlString as std::convert::From<&str>>::from("<trusted>")}
+        {slices::attribute("checked", true).unwrap()}
+        {slices::attribute("title", model).unwrap()}
+        {slices::attribute("none", std::option::Option::<&str>::None).unwrap()}
         @await { async {} };
         @flush;
     }
@@ -52,7 +56,10 @@ fn renamed_dependency_without_prelude_executes_repeatedly() {
             std::task::Poll::Ready(std::result::Result::Ok(()))
         ));
         std::mem::drop(future);
-        std::assert_eq!(writer.bytes, b"prefix&lt;&amp;&gt;");
+        std::assert_eq!(
+            writer.bytes,
+            b"prefix&lt;&amp;&gt;42false<trusted> checked=\"checked\" title=\"&lt;&amp;&gt;\""
+        );
         std::assert_eq!(writer.flushes, 2);
     }
 }

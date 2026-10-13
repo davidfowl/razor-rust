@@ -5,7 +5,7 @@
 
 use std::{fmt, io};
 
-use crate::{HtmlString, WriteHtmlValue};
+use crate::{AsyncHtmlWriter, AsyncSliceWriter, AsyncWriteHtmlValue, HtmlString, WriteHtmlValue};
 
 /// An invalid attribute name, rejected before any output is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +49,20 @@ pub trait AttributeValue {
     /// Writes the value without delimiters; `name` is already validated by
     /// [`attribute`]. Errors must be returned to the caller.
     fn write_attribute_value(&self, name: &str, writer: &mut dyn io::Write) -> io::Result<()>;
+}
+
+/// Explicit async conditional attribute semantics for validated [`Attribute`]s.
+///
+/// Extends the synchronous omission contract, but never buffers its writer
+/// implementation. Custom values must opt in and write text safe for a
+/// double-quoted attribute. Trusted body HTML is not automatically safe here.
+pub trait AsyncAttributeValue: AttributeValue + Sync {
+    /// Writes the value without delimiters or an implicit flush.
+    fn write_attribute_async<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> impl std::future::Future<Output = io::Result<()>> + Send;
 }
 
 /// A validated, reusable attribute implementing [`WriteHtmlValue`].
@@ -147,6 +161,58 @@ impl<V: AttributeValue> WriteHtmlValue for Attribute<'_, V> {
     }
 }
 
+impl<V: AsyncAttributeValue> AsyncWriteHtmlValue for Attribute<'_, V> {
+    async fn write_html_async<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> io::Result<()> {
+        if self.value.is_omitted() {
+            return Ok(());
+        }
+        output.write_literal(" ").await?;
+        output.write_literal(self.name).await?;
+        output.write_literal("=\"").await?;
+        self.value.write_attribute_async(self.name, output).await?;
+        output.write_literal("\"").await
+    }
+}
+
+impl AsyncAttributeValue for bool {
+    async fn write_attribute_async<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> io::Result<()> {
+        if *self {
+            output.write_value(name).await?;
+        }
+        Ok(())
+    }
+}
+
+impl<V: AsyncAttributeValue + ?Sized> AsyncAttributeValue for &V {
+    async fn write_attribute_async<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> io::Result<()> {
+        (**self).write_attribute_async(name, output).await
+    }
+}
+
+impl<V: AsyncAttributeValue> AsyncAttributeValue for Option<V> {
+    async fn write_attribute_async<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> io::Result<()> {
+        match self {
+            None => Ok(()),
+            Some(value) => value.write_attribute_async(name, output).await,
+        }
+    }
+}
+
 impl AttributeValue for bool {
     fn is_omitted(&self) -> bool {
         !self
@@ -196,6 +262,15 @@ macro_rules! impl_attribute_value {
                     writer: &mut dyn io::Write,
                 ) -> io::Result<()> {
                     self.write_html_to(writer)
+                }
+            }
+            impl AsyncAttributeValue for $value {
+                async fn write_attribute_async<W: AsyncSliceWriter + Send>(
+                    &self,
+                    _name: &str,
+                    output: &mut AsyncHtmlWriter<'_, W>,
+                ) -> io::Result<()> {
+                    self.write_html_async(output).await
                 }
             }
         )*

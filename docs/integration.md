@@ -6,6 +6,12 @@ feature branches without changing main or any source PR branch. They remain
 unmerged. Local merge commits assemble sources for verification; they do not
 authorize repository merges, publishing or deployment.
 
+The separate [#62 / PR #63](https://github.com/davidfowl/razor-rust/pull/63)
+follow-up starts from frozen #61 head
+`7b6a8aeac067a06f64eae656a79ccdea5b035619` and adds typed generated async values.
+It targets main with all unmerged dependencies below; none of the source
+branches are modified by the follow-up.
+
 ## Exact source deliveries
 
 | PR | Head | Scope |
@@ -77,9 +83,11 @@ comparisons; MSRV compares the integrated sample's actual stdout as well.
 ## Remaining work
 
 Typed generated async templates from verified Ready #58/#59 are included.
-Their initial interpolation accepts strings, not all synchronous primitive,
-trusted-HTML or attribute values; focused generated value parity is
-[#62](https://github.com/davidfowl/razor-rust/issues/62) under #3/#2/#11.
+Focused [#62](https://github.com/davidfowl/razor-rust/issues/62) under #3/#2/#11
+adds bounded primitive, trusted-HTML and conditional attribute interpolation
+in this follow-up source. The generated mixed-value executable and real HTTP/1
+test observe an exact prefix before releasing later application work.
+Custom synchronous values still require explicit async implementations.
 Reserved ADR reconciliation #28/#29 is not overwritten. Current source
 instructions and README describe the assembled code, not historical
 scaffolding.

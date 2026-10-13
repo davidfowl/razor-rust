@@ -2,6 +2,8 @@
 
 This bounded runtime adapter implements single-value, empty-prefix attributes,
 not new template grammar or the entire Razor attribute state machine.
+The original #43/#44 delivery notes below describe that milestone; the current
+#62/#63 async follow-up is cumulative over integration #61, not landed on main.
 
 ## Pinned upstream contract
 
@@ -21,11 +23,11 @@ Reference revision:
 
 ## Implementation boundaries
 
-The branch targets main directly and does not depend on unmerged inline macro
-#31 or partial #33. The adapter will implement the existing `WriteHtmlValue`
-extension point, so those consumers can interpolate it without parser changes.
-Only additive exports touch `lib.rs`; encoder, Slice, macros, shared samples,
-workspace membership, README and ADR files are not owned by this change.
+The original #43/#44 adapter implements `WriteHtmlValue`; this integration
+source includes its inline macro consumers. The separate #62/#63 follow-up
+adds explicit async value contracts on frozen integration #61, retaining all
+unmerged source dependencies listed in [the integration guide](../../docs/integration.md).
+Synchronous behavior and name validation remain unchanged.
 
 Attribute names use a conservative ASCII grammar, rejecting malformed
 names explicitly before any writing, even for an omitted value. This is a
@@ -33,7 +35,7 @@ runtime safety boundary absent from the upstream compiler-generated name path.
 It does not sanitize URL schemes or prohibit event-handler attributes.
 
 Compound/prefixed attribute parts, compiler-specific data-* treatment, general
-object dispatch, async codegen and byte-identical .NET encoding/culture
+object dispatch and byte-identical .NET encoding/culture
 formatting are not included. Values reuse the existing Rust writer contract.
 
 ## API and output
@@ -102,10 +104,9 @@ rendering, not a macro dependency or a change to the shared Todos sample.
 
 ## Consumer integration and concurrency
 
-Main does not yet provide `html!` or `Slice::render_to_writer`. The direct
-`WriteHtmlValue` adapter works on main's runtime; text consumers cannot simply
-interpolate it through `Display`. The unmerged #31/#33 byte-to-text bridge can
-consume it without parser changes:
+The direct `WriteHtmlValue` adapter works on main's runtime; text consumers
+cannot simply interpolate it through `Display`. The integrated #31/#33
+byte-to-text bridge consumes it without parser changes:
 
 ```rust,ignore
 let page = html! {
@@ -119,6 +120,24 @@ let page = html! {
 Dynamic names must handle `InvalidAttributeName` before rendering (or map it to
 an `InvalidInput` I/O error in an existing Rust expression). Do not ignore errors
 or use `expect` with untrusted names.
+
+Generated `async_template!` interpolation accepts the same built-in adapters
+via `AsyncWriteHtmlValue`. Its `AsyncAttributeValue: AttributeValue + Sync`
+contract shares omission decisions but explicitly awaits typed async value
+writes; it never buffers arbitrary synchronous `AttributeValue` output.
+References/`Option` delegate, booleans repeat/omit the name, empty strings
+remain, and trusted `HtmlString` retains the quoted-context responsibility above.
+Custom attribute values must opt into both contracts. The fixed encoder and
+numeric scratch buffers are independent of value length; name/trusted writes
+borrow input directly. No automatic flush or URL policy is added.
+
+```sh
+cargo run -p razor-slices --example async_values --features tokio
+cargo test -p razor-slices --test async_templates --all-features
+```
+
+See [the generated value guide](../../docs/async-templates.md) for exact stdout,
+the observed prefix-before-await handshake and real HTTP acceptance.
 
 `tests/fixtures/inline_attributes.rs` is an opt-in integration probe for an
 isolated combined checkout with pinned #33
@@ -156,7 +175,8 @@ or model lifetimes.
 Stable and Rust 1.75 default/all-feature build/test and exact-output example
 checks, stable formatting/clippy and deny-warning docs passed locally. Exact-head
 Actions must pass before Ready. The existing CI matrix builds the example and runs the fixture regression;
-there is no workflow or manifest change.
+The #62/#63 follow-up adds its mixed-value example to the existing stable/MSRV
+fixture checks without dropping original regression coverage.
 
 This is not a full Razor port: multi-value/prefixed parts, source offsets,
 literal-part flags, compiler data-* exceptions, object reflection/ToString
