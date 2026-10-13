@@ -2,8 +2,10 @@
 
 ## Status
 
-Proposed, awaiting maintainer decision ([comment on #3][comment], no reply
-yet as of this writing).
+Accepted for the template authoring model and codegen mechanism:
+inline proc-macro templates (option A). [davidfowl's reply on #3][acceptance]
+accepts A from the [original options proposal][comment]. Codegen is not
+implemented; the initial public contracts remain undecided.
 
 ## Context
 
@@ -15,6 +17,9 @@ model and codegen mechanism before implementation starts — a hard-to-reverse
 choice once templates are authored against it.
 
 Three options were posted on the issue, [tagging @davidfowl / @DamianEdwards][comment]:
+
+The examples and tooling tradeoffs below summarize that historical proposal,
+not an accepted macro name, grammar, or guarantee of IDE support.
 
 - **A. Proc-macro, inline templates** — e.g. `html! { <p>Hello, {name}</p> }`
   (à la Maud). Full IDE/rust-analyzer support, no separate file or `build.rs`,
@@ -35,22 +40,33 @@ Three options were posted on the issue, [tagging @davidfowl / @DamianEdwards][co
 
 ## Decision
 
-**Recommended: B** (proc-macro + external template file) — closest
-architectural match to upstream, best ecosystem precedent (Askama/`rinja`),
-and keeps the `_ViewImports`/`@inherits`-style model binding conceptually
-intact. The template syntax itself would start as a practical subset
-(interpolation, `@if`/`@for`, code blocks) and expand incrementally.
+**Accepted: A** (proc-macro, inline templates). In response to the original
+A/B/C proposal, davidfowl wrote ["A looks good."][acceptance] This selects
+inline authoring and proc-macro expansion, rather than external template
+files (B) or `build.rs` codegen (C).
 
-No decision has been finalized — implementation is intentionally on hold
-pending maintainer sign-off, since starting to author templates against the
-wrong model would be costly to unwind. See [#1](https://github.com/davidfowl/razor-rust/issues/1)
-for how this blocks the layouts (#4), partials (#5), and framework
-integration (#6) sub-epics.
+**Historical recommendation: B** (proc-macro + external template file).
+The original proposal recommended B for its closer architectural match to
+upstream, ecosystem precedent (Askama/`rinja`), and conceptual fit with
+`_ViewImports`/`@inherits`-style model binding. Its suggested Razor-like
+subset (interpolation, `@if`/`@for`, code blocks) belonged to that proposal;
+neither B nor that syntax was accepted.
+
+The acceptance does not settle the initial macro return type (`Slice`
+versus `HtmlString`), declaration form, model contract, grammar, or async
+behavior. Those remain open in #3; this record does not select any of them.
 
 ## Consequences
 
-Until this is accepted, #4/#5/#6 remain blocked. Once decided, the chosen
-mechanism determines the shape of the template parser, the proc-macro crate
-boundary, and how IDE tooling support is addressed (or deferred).
+The A/B/C mechanism choice is no longer a blocker. Inline templates avoid
+requiring a separate template file or `build.rs` for the selected authoring
+model, but need a parser and proc-macro implementation with an agreed public
+contract. IDE support must be assessed against that actual implementation.
+
+Layouts (#4), partials (#5), and framework integration (#6) still depend on
+#3's remaining contract decisions and codegen work. Acceptance of this
+mechanism does not complete those epics or promise incremental async
+rendering, which remains tracked separately in #11.
 
 [comment]: https://github.com/davidfowl/razor-rust/issues/3#issuecomment-6130303507
+[acceptance]: https://github.com/davidfowl/razor-rust/issues/3#issuecomment-6132090066

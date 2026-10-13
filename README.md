@@ -61,8 +61,11 @@ Runnable version: [`crates/razor-slices/examples/hello.rs`](crates/razor-slices/
 ## What's next
 
 - [#3](https://github.com/davidfowl/razor-rust/issues/3) — template syntax
-  and codegen, so templates are authored as template files rather than
-  hand-written `Slice` impls
+  and codegen: [inline proc-macro templates were accepted](https://github.com/davidfowl/razor-rust/issues/3#issuecomment-6132090066)
+  (option A), rather than external template files. The initial macro return
+  type, declaration form, model contract, grammar, and async behavior remain
+  undecided; codegen is not implemented. See [ADR 0001](docs/adr/0001-template-syntax-and-codegen-mechanism.md)
+  for the decision and the historical external-file recommendation.
 - [#4](https://github.com/davidfowl/razor-rust/issues/4) — layouts & sections
 - [#5](https://github.com/davidfowl/razor-rust/issues/5) — partials
 - [#6](https://github.com/davidfowl/razor-rust/issues/6) — web framework

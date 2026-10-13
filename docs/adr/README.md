@@ -50,7 +50,7 @@ What this makes easier, harder, or forecloses going forward.
 
 | # | Title | Status |
 |---|-------|--------|
-| [0001](./0001-template-syntax-and-codegen-mechanism.md) | Template syntax & codegen mechanism | Proposed, awaiting maintainer decision |
+| [0001](./0001-template-syntax-and-codegen-mechanism.md) | Template syntax & codegen mechanism | Accepted (inline proc-macro mechanism; contracts and implementation pending) |
 | [0002](./0002-async-runtime-dependency-for-streaming-rendering.md) | Async runtime dependency for streaming rendering | Accepted (implemented) |
 | [0003](./0003-byte-oriented-zero-allocation-html-encoding.md) | Byte-oriented, zero-allocation HTML encoding | Accepted (implemented) |
 | [0004](./0004-ci-hardening-and-gated-crates-io-release-workflow.md) | CI hardening & gated crates.io release workflow | Accepted (implemented) |
