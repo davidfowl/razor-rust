@@ -25,6 +25,9 @@ use std::io;
 
 use crate::{RenderError, Slice};
 
+mod incremental;
+pub use incremental::{render_incremental, AsyncHtmlWriter, AsyncSlice};
+
 /// A minimal, runtime-agnostic async byte sink used by streaming rendering.
 ///
 /// This is the Rust equivalent of upstream's `PipeWriter` / `TextWriter`
@@ -45,15 +48,14 @@ pub trait AsyncSliceWriter {
     ///
     /// This is the equivalent of upstream's mid-template `FlushAsync()`,
     /// used by the streaming sample to push partially-rendered output to the
-    /// client before the rest of the template has finished rendering. Actual
-    /// mid-template flush *calls* require `@await`/async support in
-    /// generated template code, tracked separately in
-    /// <https://github.com/davidfowl/razor-rust/issues/3>; this trait method
-    /// is the runtime primitive those call sites will use once that lands.
+    /// client before the rest of the template has finished rendering.
+    /// [`AsyncSlice`] implementations can call this through
+    /// [`AsyncHtmlWriter::flush`] today; generated async template syntax is
+    /// tracked separately in <https://github.com/davidfowl/razor-rust/issues/3>.
     fn flush(&mut self) -> impl std::future::Future<Output = io::Result<()>> + Send;
 }
 
-/// An error that occurred while rendering a [`Slice`] asynchronously.
+/// An error that occurred while rendering a slice asynchronously.
 #[derive(Debug)]
 pub enum AsyncRenderError {
     /// Rendering the template body failed.
@@ -102,11 +104,10 @@ impl From<io::Error> for AsyncRenderError {
 /// an HTTP response body) is expected today, without waiting on template
 /// codegen to support genuine incremental, mid-template streaming.
 ///
-/// True streaming — writing output as each template section renders, with
-/// `@await`-driven mid-template flushes — requires generated `Slice` impls
-/// that call [`AsyncSliceWriter`] directly as they render, which depends on
-/// async/`@await` support in codegen (#3). This function is the interim
-/// (and likely permanent fallback) path for slices that don't need that.
+/// For true incremental execution and mid-template flushes, implement
+/// [`AsyncSlice`] and use [`render_incremental`]. Generated async/`@await`
+/// syntax remains separate codegen work (#3). This function retains the
+/// fully buffered behavior for existing synchronous slices.
 pub async fn render_async(
     slice: &(impl Slice + ?Sized),
     writer: &mut impl AsyncSliceWriter,

@@ -14,6 +14,9 @@ mod slice;
 
 #[cfg(feature = "tokio")]
 pub use async_slice::TokioWriter;
-pub use async_slice::{render_async, AsyncRenderError, AsyncSliceWriter};
+pub use async_slice::{
+    render_async, render_incremental, AsyncHtmlWriter, AsyncRenderError, AsyncSlice,
+    AsyncSliceWriter,
+};
 pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use slice::{RenderError, Slice};
