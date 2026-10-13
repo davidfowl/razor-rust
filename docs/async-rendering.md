@@ -40,6 +40,15 @@ or background task. Each write and flush is awaited before later work, so
 writer backpressure is honored. Sink acceptance is not network visibility:
 flush according to the destination's own contract.
 
+## Named sections
+
+Explicit lazy async sections are described in [async-sections.md](async-sections.md).
+`with_async_section` associates reusable section renderers;
+`AsyncHtmlWriter::write_section` validates and awaits their execution at each
+insertion on the same destination. The `async_sections` example proves that a
+section's prefix is observable before its later await completes. This is
+separate from inherited/declarative layout context and generated async syntax.
+
 ## Errors, repetition and cancellation
 
 Writer/flush errors become `AsyncRenderError::Write`; template formatting
