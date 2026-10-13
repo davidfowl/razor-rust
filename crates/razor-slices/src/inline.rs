@@ -36,6 +36,10 @@ impl<F> Slice for InlineSlice<F>
 where
     F: Fn(&mut dyn io::Write) -> io::Result<()>,
 {
+    fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.write_to(writer)
+    }
+
     fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
         let mut adapter = TextWriter {
             writer,

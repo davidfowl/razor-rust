@@ -95,11 +95,12 @@ Template declarations/strongly typed model factories, dedicated control-flow DSL
 and async expressions/codegen remain in [#3](https://github.com/davidfowl/razor-rust/issues/3).
 Ordinary Rust expressions can contain blocks or conditionals but there are no
 Razor directives. Layouts/sections remain [#4](https://github.com/davidfowl/razor-rust/issues/4),
-partials [#5](https://github.com/davidfowl/razor-rust/issues/5), web integration
+async/context-aware partials [#5](https://github.com/davidfowl/razor-rust/issues/5), web integration
 [#6](https://github.com/davidfowl/razor-rust/issues/6), and true asynchronous
 mid-template streaming [#11](https://github.com/davidfowl/razor-rust/issues/11).
-Use `impl Slice` return types today to keep the composition direction without
-claiming automatic partial interpolation.
+Explicit synchronous partial composition and a typed model-list sample are now
+documented in [PARTIALS.md](PARTIALS.md). Use `partial(child)` to render a child
+inside `html!`; there is still no implicit slice interpolation.
 
 The shared ADR/index/README correction is owned by
 [#28](https://github.com/davidfowl/razor-rust/issues/28)/[PR #29](https://github.com/davidfowl/razor-rust/pull/29).

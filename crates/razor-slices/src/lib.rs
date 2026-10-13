@@ -11,6 +11,7 @@
 mod async_slice;
 mod html;
 mod inline;
+mod partial;
 mod slice;
 
 #[cfg(feature = "tokio")]
@@ -18,6 +19,7 @@ pub use async_slice::TokioWriter;
 pub use async_slice::{render_async, AsyncRenderError, AsyncSliceWriter};
 pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use inline::InlineSlice;
+pub use partial::{partial, Partial};
 pub use slice::{RenderError, Slice};
 
 #[doc(hidden)]

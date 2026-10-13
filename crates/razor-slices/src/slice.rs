@@ -1,14 +1,13 @@
 //! The [`Slice`] trait: the Rust equivalent of upstream's `RazorSlice` base
 //! class (see `src/RazorSlices/RazorSlice.cs` upstream).
 //!
-//! This initial version renders synchronously to an in-memory buffer
-//! (`String` / `Vec<u8>`), matching the subset of upstream's supported
-//! rendering targets that doesn't require async I/O. Streaming rendering to
+//! Synchronous rendering supports text/byte writers and convenience in-memory
+//! buffers (`String` / `Vec<u8>`). The buffered bridge to
 //! an async writer (mirroring `RenderAsync(PipeWriter, ...)`) is provided by
 //! [`crate::render_async`] / [`crate::AsyncSliceWriter`]
 //! (<https://github.com/davidfowl/razor-rust/issues/11>).
 
-use std::fmt;
+use std::{fmt, io};
 
 /// An error that occurred while rendering a [`Slice`].
 #[derive(Debug)]
@@ -46,6 +45,27 @@ pub trait Slice {
     /// content, matching upstream's auto-encoding behavior for `@expr`.
     fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result;
 
+    /// Renders directly to a byte writer, without buffering the template.
+    ///
+    /// The default adapts [`Self::render`], retaining original destination I/O
+    /// errors. A text renderer's own [`fmt::Error`] becomes an
+    /// [`io::ErrorKind::Other`] error with that error as its source.
+    /// Byte-native implementations should override this to preserve their
+    /// own I/O errors, as [`crate::InlineSlice`] does.
+    ///
+    /// Does not flush the destination. Output can be partial on failure.
+    fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        let mut adapter = ByteWriter {
+            writer,
+            error: None,
+        };
+        let result = self.render(&mut adapter);
+        match adapter.error {
+            Some(error) => Err(error),
+            None => result.map_err(io::Error::other),
+        }
+    }
+
     /// Renders the template to an owned [`String`].
     fn render_to_string(&self) -> Result<String, RenderError> {
         let mut out = String::new();
@@ -58,9 +78,9 @@ pub trait Slice {
     /// This is a straightforward `String` -> `Vec<u8>` conversion for now; a
     /// direct-to-bytes fast path (avoiding the UTF-16/UTF-8 non-issue that
     /// `String` sidesteps, but still avoiding an intermediate `String`
-    /// allocation) is a possible future optimization. For streaming output
-    /// directly to a destination without buffering first, see
-    /// [`crate::render_async`].
+    /// allocation) is a possible future optimization. For synchronous output
+    /// without buffering first, see [`Self::render_to_writer`]. For the
+    /// buffered async destination bridge, see [`crate::render_async`].
     fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
         Ok(self.render_to_string()?.into_bytes())
     }
@@ -74,11 +94,36 @@ impl<S: Slice + ?Sized> Slice for &S {
     fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
         (**self).render(writer)
     }
+
+    fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).render_to_writer(writer)
+    }
 }
 
 impl<S: Slice + ?Sized> Slice for Box<S> {
     fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
         (**self).render(writer)
+    }
+
+    fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).render_to_writer(writer)
+    }
+}
+
+struct ByteWriter<'a> {
+    writer: &'a mut dyn io::Write,
+    error: Option<io::Error>,
+}
+
+impl fmt::Write for ByteWriter<'_> {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        if self.error.is_some() {
+            return Err(fmt::Error);
+        }
+        self.writer.write_all(text.as_bytes()).map_err(|error| {
+            self.error = Some(error);
+            fmt::Error
+        })
     }
 }
 
