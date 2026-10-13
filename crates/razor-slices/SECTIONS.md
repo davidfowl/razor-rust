@@ -141,8 +141,8 @@ To expose sections to an outer layout, explicitly associate sections on the
 inner document; nested sections remain scoped to their own bodies. Generated
 declarative layout association and automatic declared-layout bypass remain
 [#36](https://github.com/davidfowl/razor-rust/issues/36).
-Inherited/async section context, cancellation and lifecycle parity remain
-[#4](https://github.com/davidfowl/razor-rust/issues/4)/
+Inherited/async section context, cancellation and lifecycle parity have focused
+follow-up [#47](https://github.com/davidfowl/razor-rust/issues/47) under #4, alongside
 [#11](https://github.com/davidfowl/razor-rust/issues/11); the existing async
 bridge still buffers the completed synchronous document. This is not generated
 async section syntax or end-to-end HTTP streaming.
