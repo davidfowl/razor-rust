@@ -28,6 +28,17 @@ pub trait AsyncSlice: Sync {
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send;
 
+    /// Executes this slice as a child, bypassing declared layouts.
+    ///
+    /// Explicit document composition remains composed. Handwritten partials
+    /// should call this method, just like generated `@render` directives.
+    fn render_body_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send {
+        self.render_into(output)
+    }
+
     /// Executes a named section at its insertion point, without a final flush.
     ///
     /// Names are nonempty and case-sensitive; unknown sections write nothing by
@@ -53,6 +64,13 @@ impl<S: AsyncSlice + ?Sized> AsyncSlice for &S {
         (**self).render_into(output).await
     }
 
+    async fn render_body_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_body_into(output).await
+    }
+
     async fn render_section_into<W: AsyncSliceWriter + Send>(
         &self,
         name: &str,
@@ -68,6 +86,13 @@ impl<S: AsyncSlice + ?Sized> AsyncSlice for Box<S> {
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
         (**self).render_into(output).await
+    }
+
+    async fn render_body_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_body_into(output).await
     }
 
     async fn render_section_into<W: AsyncSliceWriter + Send>(

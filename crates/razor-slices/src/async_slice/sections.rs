@@ -72,31 +72,42 @@ use super::{AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter};
 /// }
 /// drop(body);
 /// ```
-pub fn with_async_section<S: AsyncSlice, T: AsyncSlice>(
+pub fn with_async_section<S: Sync, T: AsyncSlice>(
     body: S,
     name: &str,
     content: T,
-) -> io::Result<impl AsyncSlice> {
+) -> io::Result<AsyncSectioned<S, T>> {
     validate_name(name)?;
-    Ok(Sectioned {
+    Ok(AsyncSectioned {
         body,
         name: name.to_owned(),
         content,
     })
 }
 
-struct Sectioned<S, T> {
+/// A lazy section association, retaining its body's slice or layout contract.
+///
+/// Construct with [`with_async_section`]. A layout association dispatches its
+/// own sections, not its supplied body's sections, when used by an outer layout.
+pub struct AsyncSectioned<S, T> {
     body: S,
     name: String,
     content: T,
 }
 
-impl<S: AsyncSlice, T: AsyncSlice> AsyncSlice for Sectioned<S, T> {
+impl<S: AsyncSlice, T: AsyncSlice> AsyncSlice for AsyncSectioned<S, T> {
     async fn render_into<W: AsyncSliceWriter + Send>(
         &self,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> Result<(), AsyncRenderError> {
         self.body.render_into(output).await
+    }
+
+    async fn render_body_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        self.body.render_body_into(output).await
     }
 
     async fn render_section_into<W: AsyncSliceWriter + Send>(
@@ -106,9 +117,32 @@ impl<S: AsyncSlice, T: AsyncSlice> AsyncSlice for Sectioned<S, T> {
     ) -> Result<(), AsyncRenderError> {
         validate_name(name)?;
         if name == self.name {
-            self.content.render_into(output).await
+            self.content.render_body_into(output).await
         } else {
             self.body.render_section_into(name, output).await
+        }
+    }
+}
+
+impl<S: super::AsyncLayout, T: AsyncSlice> super::AsyncLayout for AsyncSectioned<S, T> {
+    async fn render_layout_into<B: AsyncSlice, W: AsyncSliceWriter + Send>(
+        &self,
+        body: &B,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        self.body.render_layout_into(body, output).await
+    }
+
+    async fn render_layout_section_into<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        validate_name(name)?;
+        if name == self.name {
+            self.content.render_body_into(output).await
+        } else {
+            self.body.render_layout_section_into(name, output).await
         }
     }
 }
