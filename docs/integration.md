@@ -6,11 +6,12 @@ feature branches without changing main or any source PR branch. They remain
 unmerged. Local merge commits assemble sources for verification; they do not
 authorize repository merges, publishing or deployment.
 
-The separate [#62 / PR #63](https://github.com/davidfowl/razor-rust/pull/63)
-follow-up starts from frozen #61 head
-`7b6a8aeac067a06f64eae656a79ccdea5b035619` and adds typed generated async values.
+The bounded [#70 / PR #71](https://github.com/davidfowl/razor-rust/pull/71)
+follow-up combines the separately verified #63 generated async value and #65
+typed nested async layout deliveries. Both start from frozen #61.
 It targets main with all unmerged dependencies below; none of the source
-branches are modified by the follow-up.
+branches are modified. Main was refreshed at
+`123e62dd695a2ec0fb4400f7a27179f6c6bc543d`.
 
 ## Exact source deliveries
 
@@ -32,6 +33,9 @@ branches are modified by the follow-up.
 | #55 | `2b891f6899f58f2c3e4384d4344c782ee6c11594` | Real peer-disconnect acceptance |
 | #57 | `be83e5807137e8b62a55def0321f9c317b737fd8` | Empty-prefix HTTP/1 header commitment |
 | #59 | `e10fe1cf8fa451e13264129abe916ac81183878a` | Typed generated async templates |
+| #61 | `7b6a8aeac067a06f64eae656a79ccdea5b035619` | Frozen 16-delivery integration base |
+| #63 | `43056c1cc10f96c92cdfd0c04aeec42b745024c3` | Generated primitive/trusted/conditional values |
+| #65 | `d12959b2fe574a4f80dcd599d63ea91e3d1c0fcc` | Declared/nested async layouts, immediate-content sections |
 
 The HTTP stack includes clean copies of #38's original commits. Combining
 #49 retains the original async history as well; duplicate implementation
@@ -80,6 +84,59 @@ Stable and MSRV 1.75 CI build/test the combined workspace in default and
 all-features modes. Stable also runs warning-free Clippy/docs and exact sample
 comparisons; MSRV compares the integrated sample's actual stdout as well.
 
+## Combined async acceptance
+
+```sh
+cargo run --locked -p razor-slices --example combined_async --features tokio > target/combined-async-output.txt
+diff -u crates/razor-slices/tests/fixtures/combined_async.txt target/combined-async-output.txt
+cargo test --locked -p razor-slices --test combined_async --all-features
+cargo test --locked -p razor-slices-axum --test http
+```
+
+The shared generated declaration accepts a borrowed `&Model` or an owned
+`Model`. Both reusable documents render twice through a one-byte duplex;
+the exact mixed-value header prefix arrives before held application work is
+released. The generated body includes numbers, escaped Unicode, omitted false/
+None attributes, retained empty attributes and explicit trusted markup. An
+explicit badge layout stays composed in bare partials; the declared document
+and its sections do not.
+
+The outer layout only queries its immediate inner layout. Its `"header"` is
+absent, so it does not recursively discover the page header. The inner layout
+inserts that header once. After body execution the outer `"footer-links"`
+dispatch invokes the inner layout's own section method with its original
+child, which explicitly inserts the child's generated `"links"` section.
+No cached render state, global recursive lookup, mandatory executor or
+whole-page production buffer is introduced.
+
+The complete fixture prints borrowed/owned prefixes, documents and partials.
+Regression tests hold, resume, fail and drop every observed destination write
+and flush boundary, checking exact byte prefixes, original error sources and
+no advance under backpressure. A held flush prevents section entry even when
+application work is released. Dropping an entered section stops its completion,
+suffix and final flush. Reference/box wrappers preserve full/bare dispatch.
+The actual HTTP/1 test repeats documents with separate POST release requests,
+checks exact bodies and partials, and closes the client TCP connection during
+the held section to verify renderer drop. Existing pending-write disconnect
+and response-commitment regressions remain in the same suite.
+
+Run the same shared declaration as a local server:
+
+```sh
+cargo run --locked -p razor-slices-axum --example combined_server
+curl --no-buffer -i http://127.0.0.1:3000/combined
+# In another terminal, after observing the mixed-value header prefix:
+curl -i -X POST http://127.0.0.1:3000/release
+curl -i http://127.0.0.1:3000/partial
+```
+
+Repeat the document/release pair for another fresh await. Each release permits
+one held header, not all concurrent requests. `BIND_ADDRESS` can select a
+different local address. This is local executable acceptance, not a hosted
+preview. Stable/MSRV CI runs the actual stdout fixture in addition to runtime
+and real HTTP tests. The original async-value and async-layout fixtures remain
+unchanged and executable.
+
 ## Remaining work
 
 Typed generated async templates from verified Ready #58/#59 are included.
@@ -99,5 +156,7 @@ observable section handshake. Synchronous nested provider context remains
 [#66](https://github.com/davidfowl/razor-rust/issues/66), with broader layout
 lifecycle in #47. The #61 source heads above remain frozen. Request context/tokens, portable
 explicit response-start, lifecycle/threshold-flush and broader encoder policy
-remain #52/#11. Proxy/HTTP2 behavior and complete .NET parity are not inferred
+remain #52/#11. The separately delivered #68 request-scope source is not part
+of this pinned assembly; combined token/layout acceptance remains focused #69,
+not a tested claim here. Proxy/HTTP2 behavior and complete .NET parity are not inferred
 from local HTTP/1 tests. Broader benchmark parity remains #8.

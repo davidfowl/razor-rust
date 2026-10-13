@@ -14,6 +14,15 @@ also includes typed generated async templates from #59. Its streaming page
 uses `async_template!` with an owned model, explicit flush and awaited release;
 the commands and exact HTTP fixture below are unchanged. See
 [the integration guide](../../docs/integration.md) for the full pinned stack.
+The bounded [PR #71](https://github.com/davidfowl/razor-rust/pull/71) follow-up
+also runs `combined_server`: the same generated mixed-value page used by the
+one-byte standalone sample, with nested typed layouts and immediate-content
+sections. See [combined acceptance and commands](../../docs/integration.md#combined-async-acceptance)
+for `/combined`, `/release` and bare `/partial` routes. Real HTTP tests repeat
+the full/release/partial handshake and verify peer-disconnect drop inside the
+held section. The server uses owned models; standalone renders additionally
+demonstrate borrowing. This is still an unmerged preview, not request-token
+assembly or a hosted deployment.
 
 ## Run a real streaming page
 

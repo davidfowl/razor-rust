@@ -26,3 +26,5 @@ jobs:
         run: bash crates/razor-slices-axum/tests/server-smoke.sh
       - name: Verify real streaming prefix-before-release handshake
         run: cargo test --locked -p razor-slices-axum --test http real_http_prefix_is_received_before_separate_release_request_and_exact_suffix -- --exact
+      - name: Verify combined generated values layouts partials and disconnect
+        run: cargo test --locked -p razor-slices-axum --test http combined

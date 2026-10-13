@@ -24,6 +24,8 @@ do not duplicate work already in progress.
 | [src/async_slice/value.rs](crates/razor-slices/src/async_slice/value.rs) | Explicit async interpolation contract, strings, booleans and trusted HTML; numeric fast paths share `html.rs` buffers |
 | [src/attribute.rs](crates/razor-slices/src/attribute.rs) | Shared validated conditional attributes with explicit sync/async value contracts |
 | [examples/async_values.rs](crates/razor-slices/examples/async_values.rs) | Generated mixed-value model, reusable prefix-before-await handshake and exact stdout |
+| [examples/combined_async.rs](crates/razor-slices/examples/combined_async.rs) | Combined borrowed/owned generated values, nested layouts, held section and exact document/partial output |
+| [examples/combined_server.rs](crates/razor-slices-axum/examples/combined_server.rs) | Same combined declaration over real local HTTP, with separate release and partial routes |
 | [examples/hello.rs](crates/razor-slices/examples/hello.rs) | Runnable hand-written `Slice` demo |
 | [examples/html_encode_bench.rs](crates/razor-slices/examples/html_encode_bench.rs) | Existing HTML encoder microbenchmark |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | Stable and MSRV CI, with default/all-features coverage |

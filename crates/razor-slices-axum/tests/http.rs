@@ -19,6 +19,8 @@ use razor_slices_axum::{SliceResponse, StreamingSliceResponse};
 use tower::ServiceExt;
 use tracing::instrument::WithSubscriber;
 
+#[path = "../examples/support/combined.rs"]
+mod combined;
 #[path = "../../razor-slices/examples/support/async_values.rs"]
 mod generated_values;
 #[path = "../examples/support/page.rs"]
@@ -909,4 +911,139 @@ async fn generated_mixed_values_stream_exactly_over_http_before_later_work() {
     })
     .await
     .expect("generated value HTTP prefix handshake must not deadlock");
+}
+
+#[tokio::test]
+async fn combined_generated_layout_values_repeat_over_real_http_and_partial_bypasses_sections() {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let model = combined::sample::Model::demo();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = combined::app(model.clone());
+        let _server = AbortOnDrop(tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        }));
+        let (mut client, connection) = http_client(address).await;
+        let _connection = AbortOnDrop(connection);
+        for round in 0..2 {
+            let response = client
+                .send_request(
+                    Request::builder()
+                        .uri("/combined")
+                        .header("host", address.to_string())
+                        .body(Empty::new())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.headers()["content-type"],
+                "text/html; charset=utf-8"
+            );
+            let mut output = response.into_body();
+            let mut bytes = Vec::new();
+            while bytes.len() < combined::sample::PREFIX.len() {
+                bytes.extend_from_slice(
+                    &output.frame().await.unwrap().unwrap().into_data().unwrap(),
+                );
+            }
+            assert_eq!(bytes, combined::sample::PREFIX.as_bytes());
+            assert_eq!(model.completed.load(Ordering::SeqCst), round);
+            let (mut release_client, release_connection) = http_client(address).await;
+            let _release_connection = AbortOnDrop(release_connection);
+            let response = release_client
+                .send_request(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/release")
+                        .header("host", address.to_string())
+                        .body(Empty::new())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::NO_CONTENT);
+            assert!(response
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .is_empty());
+            bytes.extend_from_slice(&output.collect().await.unwrap().to_bytes());
+            assert_eq!(bytes, combined::sample::PAGE.as_bytes());
+            assert_eq!(model.completed.load(Ordering::SeqCst), round + 1);
+            let response = client
+                .send_request(
+                    Request::builder()
+                        .uri("/partial")
+                        .header("host", address.to_string())
+                        .body(Empty::new())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.headers()["content-type"],
+                "text/html; charset=utf-8"
+            );
+            assert_eq!(
+                response.into_body().collect().await.unwrap().to_bytes(),
+                combined::sample::PARTIAL.as_bytes()
+            );
+            assert_eq!(model.entered.load(Ordering::SeqCst), round + 1);
+        }
+        assert_eq!(model.dropped.load(Ordering::SeqCst), 2);
+    })
+    .await
+    .expect("combined document/release/partial HTTP handshake must not deadlock");
+}
+
+#[tokio::test]
+async fn real_peer_disconnect_drops_combined_declared_layout_section_await() {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let model = combined::sample::Model::demo();
+        let app = combined::app(model.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let _server = AbortOnDrop(tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        }));
+        let (mut client, connection) = http_client(address).await;
+        let mut connection = AbortOnDrop(connection);
+        let response = client
+            .send_request(
+                Request::builder()
+                    .uri("/combined")
+                    .header("host", address.to_string())
+                    .body(Empty::new())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let mut output = response.into_body();
+        let mut bytes = Vec::new();
+        while bytes.len() < combined::sample::PREFIX.len() {
+            bytes.extend_from_slice(&output.frame().await.unwrap().unwrap().into_data().unwrap());
+        }
+        assert_eq!(bytes, combined::sample::PREFIX.as_bytes());
+        while model.entered.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        connection.0.abort();
+        assert!((&mut connection.0).await.unwrap_err().is_cancelled());
+        drop(output);
+        drop(client);
+        while model.dropped.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        model.release.notify_one();
+        assert_eq!(model.entered.load(Ordering::SeqCst), 1);
+        assert_eq!(model.dropped.load(Ordering::SeqCst), 1);
+        assert_eq!(model.completed.load(Ordering::SeqCst), 0);
+    })
+    .await
+    .expect("disconnect must drop the combined nested layout renderer");
 }

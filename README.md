@@ -7,7 +7,8 @@ rendering — without pulling in a full web/MVC framework.
 
 > **Status: usable integration preview, not a complete port.** This source
 > assembles the delivered template, layout, section and HTTP features in
-> [PR #61](https://github.com/davidfowl/razor-rust/pull/61). Its source PRs
+> [PR #61](https://github.com/davidfowl/razor-rust/pull/61), with verified async
+> value/layout deliveries #63/#65 combined in [PR #71](https://github.com/davidfowl/razor-rust/pull/71). Its source PRs
 > remain unmerged; this is not a claim that the preview is on main or released.
 > See [#1](https://github.com/davidfowl/razor-rust/issues/1) for the live roadmap.
 
@@ -83,6 +84,9 @@ cargo run --locked -p razor-slices --example async_values --features tokio
 # Nested declared async layouts and sections, followed by the bare partial:
 cargo run --locked -p razor-slices --example async_layout --features tokio
 
+# Both features together: borrowed/owned models, repeated documents and partials:
+cargo run --locked -p razor-slices --example combined_async --features tokio
+
 # Actual HTTP streaming; release the held page from another terminal:
 cargo run --locked -p razor-slices-axum --example streaming_server
 curl --no-buffer -i http://127.0.0.1:3000/stream
@@ -98,6 +102,7 @@ is open. Servers run locally; no hosted preview or deployment is provided.
 | Incremental rendering and async sections | [Async rendering](docs/async-rendering.md), [section handshake](docs/async-sections.md) |
 | Generated typed async templates | [Grammar, ownership and actual prefix handshake](docs/async-templates.md) |
 | Declared/nested async layouts and bare partial | [Immediate-content sections, handshake and exact output](docs/async-layouts.md) |
+| Mixed values through nested async layouts, over bounded I/O and HTTP | [Combined sample and HTTP commands](docs/integration.md#combined-async-acceptance), [exact stdout](crates/razor-slices/tests/fixtures/combined_async.txt) |
 | Atomic buffered HTTP response | [Axum sample](crates/razor-slices-axum/README.md) |
 | Bounded streaming HTTP response | [Server, commands and transport limits](crates/razor-slices-axum/STREAMING.md) |
 

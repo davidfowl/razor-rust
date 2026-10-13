@@ -87,6 +87,13 @@ jobs:
           diff -u crates/razor-slices/tests/fixtures/async_layout.txt target/async-layout-output.txt
           cat target/async-layout-output.txt
 
+      - name: Verify combined async values layouts and partial stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run --locked -p razor-slices --example combined_async --features tokio > target/combined-async-output.txt
+          diff -u crates/razor-slices/tests/fixtures/combined_async.txt target/combined-async-output.txt
+          cat target/combined-async-output.txt
+
   docs:
     runs-on: ubuntu-latest
     strategy:
@@ -166,3 +173,6 @@ jobs:
           cargo run --locked -p razor-slices --example async_layout --features tokio > target/async-layout-output.txt
           diff -u crates/razor-slices/tests/fixtures/async_layout.txt target/async-layout-output.txt
           cat target/async-layout-output.txt
+          cargo run --locked -p razor-slices --example combined_async --features tokio > target/combined-async-output.txt
+          diff -u crates/razor-slices/tests/fixtures/combined_async.txt target/combined-async-output.txt
+          cat target/combined-async-output.txt
