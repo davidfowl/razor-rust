@@ -3,8 +3,9 @@
 ## Status
 
 Accepted (implemented in [#17](https://github.com/davidfowl/razor-rust/pull/17)).
-The deeper tokio-vs-agnostic tradeoff question is still open for maintainer
-reply, but the reversible foundational design below has landed.
+The foundation is merged. The additive incremental execution extension below
+is a delegated implementation choice, not a historical maintainer approval
+of a final async codegen/runtime contract.
 
 ## Context
 
@@ -53,19 +54,43 @@ preserve `Slice`'s object-safety (`Box<dyn Slice>` / `&dyn Slice` from #16).
 
 ## Consequences
 
-- `razor-slices` gained async/streaming rendering without a mandatory
+- `razor-slices` gained a buffered async I/O bridge without a mandatory
   runtime dependency; consumers opt into `tokio` via a Cargo feature.
 - `dyn AsyncSliceWriter` isn't usable yet (native `async fn`-in-traits
   limitation) — only generic (`impl AsyncSliceWriter`) call sites work for
   now.
 - No `async-std`/`smol`/`futures::io::AsyncWrite` adapters exist yet;
   straightforward to add as separate default-off features later.
-- Genuinely incremental mid-template streaming (vs. today's
-  buffer-then-write bridge) still depends on `@await` support landing in
-  codegen (#3).
+- Hand-written incremental execution is now available through the separate
+  `AsyncSlice` contract below; generated `@await` support remains under #3.
 - CI exercises default features and `--all-features` (including the `tokio`
   adapter doctest) in stable lint/build/test/docs and MSRV build/test checks,
   covering the follow-up tracked in [#20](https://github.com/davidfowl/razor-rust/issues/20)
   under #7.
+
+## Delegated incremental execution extension
+
+[#37](https://github.com/davidfowl/razor-rust/issues/37), under #11, adds
+`AsyncSlice`, `AsyncHtmlWriter` and `render_incremental` independently of the
+unmerged macro/layout work. This reversible additive API is chosen under
+delegated implementation discretion; it does not assert that maintainers
+approved the original dependency options or a generated async template
+contract. No new production dependency is introduced.
+
+Keep `Slice` and the fully buffered `render_async` bridge unchanged.
+Hand-written async slices await borrowed literal writes, bounded escaped
+string writes and explicit mid-template flushes in source order. The helper
+final-flushes only after success. Reusing the existing synchronous encoder in
+1,024-byte UTF-8 chunks bounds scratch space at 6,144 bytes, avoiding duplicated
+escape rules or full-page buffering. This costs a bounded copy per escaped
+chunk; direct borrowed literal writes do not copy.
+
+Tradeoffs: static generic dispatch, `Sync` slices/`Send` writers and futures,
+no token API or rollback on dropped futures, no automatic threshold flushing,
+and unconditional final flush after success (unlike upstream's threshold-based
+pipe flush). These limitations and the observable prefix-before-await example
+are documented in [async rendering](../async-rendering.md). Async macro grammar,
+framework response integration and deeper C# cancellation/flush/encoder parity
+remain under #3/#6/#11 rather than blocking this independent runtime delivery.
 
 [comment]: https://github.com/davidfowl/razor-rust/issues/11#issuecomment-6130392034

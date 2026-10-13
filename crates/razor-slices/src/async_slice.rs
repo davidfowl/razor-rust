@@ -3,15 +3,17 @@
 //! The synchronous [`crate::Slice`] trait renders to an in-memory buffer
 //! (`String` / `Vec<u8>`). Upstream's primary rendering path is async and
 //! streaming (`RenderAsync(PipeWriter, ...)` / `RenderAsync(TextWriter, ...)`),
-//! writing directly into the HTTP response body as the template renders,
-//! rather than building a full buffer first. This module adds the Rust
-//! equivalent, tracked in <https://github.com/davidfowl/razor-rust/issues/11>.
+//! writing into the destination as the template renders, rather than building
+//! a full buffer first. [`AsyncSlice`] / [`render_incremental`] provide this
+//! execution path; [`render_async`] retains the buffered synchronous bridge.
+//! HTTP integration remains separate work. This module is tracked in
+//! <https://github.com/davidfowl/razor-rust/issues/11>.
 //!
 //! ## Runtime dependency
 //!
 //! This crate does not mandate any particular async runtime for its core
 //! rendering path. [`AsyncSliceWriter`] is a minimal, hand-rolled trait (using
-//! native `async fn` in traits, stable since Rust 1.75 — this crate's MSRV) so
+//! return-position `impl Future` in traits, stable since Rust 1.75, our MSRV) so
 //! that consumers on `tokio`, `async-std`, `smol`, or any other executor can
 //! all implement it for their own writer types without this crate pulling in
 //! any of them as a mandatory dependency. A ready-made adapter for
@@ -24,6 +26,11 @@
 use std::io;
 
 use crate::{RenderError, Slice};
+
+mod incremental;
+mod sections;
+pub use incremental::{render_incremental, AsyncHtmlWriter, AsyncSlice};
+pub use sections::with_async_section;
 
 /// A minimal, runtime-agnostic async byte sink used by streaming rendering.
 ///
@@ -45,15 +52,14 @@ pub trait AsyncSliceWriter {
     ///
     /// This is the equivalent of upstream's mid-template `FlushAsync()`,
     /// used by the streaming sample to push partially-rendered output to the
-    /// client before the rest of the template has finished rendering. Actual
-    /// mid-template flush *calls* require `@await`/async support in
-    /// generated template code, tracked separately in
-    /// <https://github.com/davidfowl/razor-rust/issues/3>; this trait method
-    /// is the runtime primitive those call sites will use once that lands.
+    /// client before the rest of the template has finished rendering.
+    /// [`AsyncSlice`] implementations can call this through
+    /// [`AsyncHtmlWriter::flush`] today; generated async template syntax is
+    /// tracked separately in <https://github.com/davidfowl/razor-rust/issues/3>.
     fn flush(&mut self) -> impl std::future::Future<Output = io::Result<()>> + Send;
 }
 
-/// An error that occurred while rendering a [`Slice`] asynchronously.
+/// An error that occurred while rendering a slice asynchronously.
 #[derive(Debug)]
 pub enum AsyncRenderError {
     /// Rendering the template body failed.
@@ -102,11 +108,10 @@ impl From<io::Error> for AsyncRenderError {
 /// an HTTP response body) is expected today, without waiting on template
 /// codegen to support genuine incremental, mid-template streaming.
 ///
-/// True streaming — writing output as each template section renders, with
-/// `@await`-driven mid-template flushes — requires generated `Slice` impls
-/// that call [`AsyncSliceWriter`] directly as they render, which depends on
-/// async/`@await` support in codegen (#3). This function is the interim
-/// (and likely permanent fallback) path for slices that don't need that.
+/// For true incremental execution and mid-template flushes, implement
+/// [`AsyncSlice`] and use [`render_incremental`]. Generated async/`@await`
+/// syntax remains separate codegen work (#3). This function retains the
+/// fully buffered behavior for existing synchronous slices.
 pub async fn render_async(
     slice: &(impl Slice + ?Sized),
     writer: &mut impl AsyncSliceWriter,
