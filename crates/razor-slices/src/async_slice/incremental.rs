@@ -26,6 +26,56 @@ pub trait AsyncSlice: Sync {
         &self,
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send;
+
+    /// Executes a named section at its insertion point, without a final flush.
+    ///
+    /// Names are nonempty and case-sensitive; unknown sections write nothing by
+    /// default, matching upstream's optional section execution. Use
+    /// [`super::with_async_section`] for explicit associations or override this
+    /// method for handwritten providers. Implementations must reject empty
+    /// names and propagate errors. [`AsyncHtmlWriter::write_section`] validates
+    /// names before dispatching, including to custom providers.
+    fn render_section_into<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        _output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send {
+        async move { super::sections::validate_name(name).map_err(Into::into) }
+    }
+}
+
+impl<S: AsyncSlice + ?Sized> AsyncSlice for &S {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_into(output).await
+    }
+
+    async fn render_section_into<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_section_into(name, output).await
+    }
+}
+
+impl<S: AsyncSlice + ?Sized> AsyncSlice for Box<S> {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_into(output).await
+    }
+
+    async fn render_section_into<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_section_into(name, output).await
+    }
 }
 
 /// HTML-aware output for incremental async templates.
@@ -75,6 +125,21 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
             value = rest;
         }
         Ok(())
+    }
+
+    /// Executes a named section on the same output without buffering or flushing.
+    ///
+    /// Section templates encode their own values; this insertion does not
+    /// re-encode their markup. Empty names fail with an `InvalidInput` I/O error
+    /// inside [`AsyncRenderError::Write`] before calling the provider. Unknown
+    /// nonempty names are optional and write nothing by default.
+    pub async fn write_section(
+        &mut self,
+        slice: &(impl AsyncSlice + ?Sized),
+        name: &str,
+    ) -> Result<(), AsyncRenderError> {
+        super::sections::validate_name(name)?;
+        slice.render_section_into(name, self).await
     }
 
     /// Awaits a mid-template flush, propagating backpressure and failure.
