@@ -12,6 +12,13 @@ env:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - features: default
+            cargo-flags: ""
+          - features: all-features
+            cargo-flags: "--all-features"
     steps:
       - uses: actions/checkout@v4
 
@@ -23,22 +30,31 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
+        if: matrix.features == 'default'
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets ${{ matrix.cargo-flags }} -- -D warnings
 
       - name: Build
-        run: cargo build --workspace --all-targets
+        run: cargo build --workspace --all-targets ${{ matrix.cargo-flags }}
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace ${{ matrix.cargo-flags }}
 
       - name: Run examples
+        if: matrix.features == 'default'
         run: cargo run -p razor-slices --example hello
 
   docs:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - features: default
+            cargo-flags: ""
+          - features: all-features
+            cargo-flags: "--all-features"
     steps:
       - uses: actions/checkout@v4
 
@@ -52,10 +68,17 @@ jobs:
       - name: cargo doc (deny warnings)
         env:
           RUSTDOCFLAGS: "-D warnings"
-        run: cargo doc --workspace --no-deps --document-private-items
+        run: cargo doc --workspace --no-deps --document-private-items ${{ matrix.cargo-flags }}
 
   msrv:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - features: default
+            cargo-flags: ""
+          - features: all-features
+            cargo-flags: "--all-features"
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +99,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build with MSRV
-        run: cargo build --workspace --all-targets
+        run: cargo build --workspace --all-targets ${{ matrix.cargo-flags }}
 
       - name: Test with MSRV
-        run: cargo test --workspace
+        run: cargo test --workspace ${{ matrix.cargo-flags }}

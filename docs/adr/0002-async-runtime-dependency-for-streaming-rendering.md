@@ -63,7 +63,9 @@ preserve `Slice`'s object-safety (`Box<dyn Slice>` / `&dyn Slice` from #16).
 - Genuinely incremental mid-template streaming (vs. today's
   buffer-then-write bridge) still depends on `@await` support landing in
   codegen (#3).
-- CI does not yet exercise `--all-features` (the `tokio` feature) — tracked
-  as a known gap under #7.
+- CI exercises default features and `--all-features` (including the `tokio`
+  adapter doctest) in stable lint/build/test/docs and MSRV build/test checks,
+  covering the follow-up tracked in [#20](https://github.com/davidfowl/razor-rust/issues/20)
+  under #7.
 
 [comment]: https://github.com/davidfowl/razor-rust/issues/11#issuecomment-6130392034
