@@ -20,8 +20,9 @@ mod slice;
 #[cfg(feature = "tokio")]
 pub use async_slice::TokioWriter;
 pub use async_slice::{
-    render_async, render_incremental, with_async_section, AsyncHtmlWriter, AsyncRenderError,
-    AsyncSlice, AsyncSliceWriter, AsyncWriteHtmlValue,
+    declare_async_layout, render_async, render_incremental, with_async_layout, with_async_section,
+    AsyncHtmlWriter, AsyncLayout, AsyncRenderError, AsyncSectioned, AsyncSlice, AsyncSliceWriter,
+    AsyncWriteHtmlValue, DeclaredAsyncLayout,
 };
 pub use attribute::{
     attribute, AsyncAttributeValue, Attribute, AttributeValue, InvalidAttributeName,
@@ -56,7 +57,8 @@ pub use razor_slices_macros::async_template as __async_template;
 /// - `@await { future };` awaits unit output; `@await { future }?;` propagates
 ///   errors from a unit-result future. Value-producing awaits use Rust bindings.
 /// - `@flush;` awaits an explicit flush at that insertion point.
-/// - `@render { child };` executes an async child on the same writer.
+/// - `@render { child };` executes a bare async child on the same writer,
+///   bypassing declared layouts but retaining explicit composition.
 /// - `@section { provider }, { name };` inserts an explicit lazy async section.
 ///
 /// No directive implicitly buffers, spawns, or flushes after a child. Only

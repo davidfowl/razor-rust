@@ -51,7 +51,7 @@ Every body (including nested branches/loops) accepts:
 | `@await { future };` | Await a unit-returning application future |
 | `@await { future }?;` | Await a unit-result future and propagate its convertible error |
 | `@flush;` | Await a flush at this exact insertion point |
-| `@render { child };` | Execute an `AsyncSlice` on the same writer, without an implicit flush |
+| `@render { child };` | Execute a bare `AsyncSlice` on the same writer, bypassing declared layouts but retaining explicit composition, without an implicit flush |
 | `@section { provider }, { name };` | Await explicit lazy section lookup/rendering on the same writer |
 
 Await directives deliberately require `()` (or `Result<(), E>` with `?`):
@@ -210,10 +210,10 @@ implementation discretion, not explicit maintainer approval. Rust reuse
 re-executes one shared-borrow renderer rather than pooling/disposal of C#
 slice instances. It does not claim identical encoder policy or C# lifecycle.
 
-**Known gaps:** external-file/Razor parsing is not introduced. Async declarative
-layouts and inherited section context remain [#47](https://github.com/davidfowl/razor-rust/issues/47)
-and [#36](https://github.com/davidfowl/razor-rust/issues/36); explicit associations
-use [async-sections.md](async-sections.md). Framework response lifecycle stays
+**Known gaps:** external-file/Razor parsing is not introduced. Typed async declarative layouts and immediate-content sections are now covered
+in [async-layouts.md](async-layouts.md) (#64/PR #65); broader synchronous context
+and lifecycle remain #66/#47. Explicit sections use
+[async-sections.md](async-sections.md). Framework response lifecycle stays
 [#52](https://github.com/davidfowl/razor-rust/issues/52)/[#56](https://github.com/davidfowl/razor-rust/issues/56).
 Cancellation tokens, threshold flushes, local-only writers and async trait
 objects remain #11. Historical ADR reconciliation stays #28/PR #29.
