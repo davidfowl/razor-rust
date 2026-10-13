@@ -53,6 +53,12 @@ jobs:
           cargo run -p razor-slices --example inline
           cargo run -p razor-slices --example todos > target/todos-output.html
           diff -u crates/razor-slices/tests/fixtures/todos.html target/todos-output.html
+          cargo run -p razor-slices --example layout > target/layout-output.html
+          diff -u crates/razor-slices/tests/fixtures/layout.html target/layout-output.html
+          cargo run -p razor-slices --example sections > target/sections-output.html
+          diff -u crates/razor-slices/tests/fixtures/sections.html target/sections-output.html
+          cargo run -p razor-slices --example declared_layout > target/declared-layout-output.html
+          diff -u crates/razor-slices/tests/fixtures/declared-layout.html target/declared-layout-output.html
 
   docs:
     runs-on: ubuntu-latest

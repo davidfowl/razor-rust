@@ -62,8 +62,10 @@ its capture, so Rust rejects it. Model references and borrowed children cannot
 outlive their referents. The sample uses ordinary typed Rust factories, which
 reject incorrect model arguments at compile time, not a generated model DSL.
 
-`Slice::render_to_writer` is the object-safe byte-rendering seam for composition.
-Its default adapts `fmt::Write` to `io::Write` incrementally. It retains the first
+`Slice::render_body_to_writer` is the object-safe child-rendering seam. It
+defaults to `render_to_writer` and bypasses [declared layouts](DECLARED-LAYOUTS.md),
+while preserving explicit `with_layout` composition.
+The default byte renderer adapts `fmt::Write` to `io::Write` incrementally. It retains the first
 destination `io::Error`, including its original kind/source, even if a handwritten
 text renderer ignores a failed write; later writes remain failed.
 An independent handwritten `fmt::Error` becomes `io::ErrorKind::Other` with
@@ -105,7 +107,8 @@ no new DSL or implicit raw-output/type fallback was introduced, and this is not
 a claim of explicit maintainer approval of every API detail. Remaining work:
 model declarations/dedicated control-flow and conditional attributes
 [#3](https://github.com/davidfowl/razor-rust/issues/3), layouts/sections
-[#4](https://github.com/davidfowl/razor-rust/issues/4), async/context-aware partials
+[#4](https://github.com/davidfowl/razor-rust/issues/4) beyond the explicit
+synchronous [layout/body sample](LAYOUTS.md), async/context-aware partials
 [#5](https://github.com/davidfowl/razor-rust/issues/5), web integration
 [#6](https://github.com/davidfowl/razor-rust/issues/6), and true async streaming
 [#11](https://github.com/davidfowl/razor-rust/issues/11). This does not complete

@@ -94,8 +94,10 @@ This is the bounded first milestone in
 Template declarations/strongly typed model factories, dedicated control-flow DSL,
 and async expressions/codegen remain in [#3](https://github.com/davidfowl/razor-rust/issues/3).
 Ordinary Rust expressions can contain blocks or conditionals but there are no
-Razor directives. Layouts/sections remain [#4](https://github.com/davidfowl/razor-rust/issues/4),
-async/context-aware partials [#5](https://github.com/davidfowl/razor-rust/issues/5), web integration
+Razor directives. Layout sections/declarative association remain
+[#4](https://github.com/davidfowl/razor-rust/issues/4); an explicit synchronous
+layout/body sample is documented in [LAYOUTS.md](LAYOUTS.md).
+Async/context-aware partials remain [#5](https://github.com/davidfowl/razor-rust/issues/5), web integration
 [#6](https://github.com/davidfowl/razor-rust/issues/6), and true asynchronous
 mid-template streaming [#11](https://github.com/davidfowl/razor-rust/issues/11).
 Explicit synchronous partial composition and a typed model-list sample are now

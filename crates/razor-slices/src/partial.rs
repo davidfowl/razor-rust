@@ -7,7 +7,7 @@ use crate::{Slice, WriteHtmlValue};
 /// A child slice that can be interpolated with [`crate::html!`].
 ///
 /// Construct with [`partial`]. Owns its slice (or a reference to it), rendering
-/// anew on each write. It does not cache output or infer layout/context state.
+/// anew on each write. It bypasses declared layouts, without caching output.
 pub struct Partial<S> {
     slice: S,
 }
@@ -15,7 +15,9 @@ pub struct Partial<S> {
 /// Marks a child [`Slice`] for rendering inside a parent's HTML output.
 ///
 /// Writes the child directly into the parent destination using
-/// [`Slice::render_to_writer`], without buffering or re-encoding its markup.
+/// [`Slice::render_body_to_writer`], without buffering or re-encoding its markup.
+/// Declared layouts are bypassed; explicit [`crate::with_layout`] composition
+/// is retained.
 /// The child is responsible for encoding its values, just as when rendered
 /// on its own. This is not a raw-HTML escape hatch for arbitrary strings.
 ///
@@ -87,6 +89,6 @@ pub fn partial<S: Slice>(slice: S) -> Partial<S> {
 
 impl<S: Slice> WriteHtmlValue for Partial<S> {
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
-        self.slice.render_to_writer(writer)
+        self.slice.render_body_to_writer(writer)
     }
 }
