@@ -50,9 +50,9 @@ before calling even handwritten providers. The example's page uses:
 
 ```rust,ignore
 output.write_literal("<page>").await?;
-output.write_section(&self.body, "header").await?;
-self.body.render_into(output).await?;
-output.write_section(&self.body, "optional-scripts").await?;
+output.write_section(&self.0, "header").await?;
+self.0.render_into(output).await?;
+output.write_section(&self.0, "optional-scripts").await?;
 output.write_literal("</page>\n").await?;
 ```
 
