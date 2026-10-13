@@ -135,6 +135,8 @@ cargo +1.75 test -p razor-slices --test inline_attributes
 
 The probe covers exact model/partial fixture output, repeated text and byte
 rendering, trusted dispatch, nested original I/O errors and text sink failures.
+All four probe tests passed on stable and Rust 1.75 in that isolated combined
+checkout; both adapter commits applied without conflicts to the pinned #33 head.
 It does not modify or depend on the concurrent control-flow parser branch or
 Axum workspace changes. Combining branches may require additive reconciliation
 in `lib.rs`; no existing branches are mutated. Text rendering retains that
@@ -152,8 +154,8 @@ boundaries). Compile-fail doctests reject unsupported values and escaping name
 or model lifetimes.
 
 Stable and Rust 1.75 default/all-feature build/test and exact-output example
-checks, stable formatting/clippy and deny-warning docs are required before
-Ready. The existing CI matrix builds the example and runs the fixture regression;
+checks, stable formatting/clippy and deny-warning docs passed locally. Exact-head
+Actions must pass before Ready. The existing CI matrix builds the example and runs the fixture regression;
 there is no workflow or manifest change.
 
 This is not a full Razor port: multi-value/prefixed parts, source offsets,

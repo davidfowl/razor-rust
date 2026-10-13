@@ -53,6 +53,10 @@ fn upstream_string_cases_retain_empty_values() {
         rendered(attribute("class", HtmlString::empty()).unwrap()),
         " class=\"\""
     );
+    assert_eq!(
+        rendered(attribute("checked", "false").unwrap()),
+        " checked=\"false\""
+    );
 }
 
 #[test]
