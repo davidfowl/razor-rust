@@ -53,9 +53,9 @@ pub trait AsyncSliceWriter {
     /// This is the equivalent of upstream's mid-template `FlushAsync()`,
     /// used by the streaming sample to push partially-rendered output to the
     /// client before the rest of the template has finished rendering.
-    /// [`AsyncSlice`] implementations can call this through
-    /// [`AsyncHtmlWriter::flush`] today; generated async template syntax is
-    /// tracked separately in <https://github.com/davidfowl/razor-rust/issues/3>.
+    /// [`AsyncSlice`] implementations call this through
+    /// [`AsyncHtmlWriter::flush`]; generated [`crate::async_template!`] bodies
+    /// can use the explicit `@flush;` directive.
     fn flush(&mut self) -> impl std::future::Future<Output = io::Result<()>> + Send;
 }
 
@@ -109,8 +109,8 @@ impl From<io::Error> for AsyncRenderError {
 /// codegen to support genuine incremental, mid-template streaming.
 ///
 /// For true incremental execution and mid-template flushes, implement
-/// [`AsyncSlice`] and use [`render_incremental`]. Generated async/`@await`
-/// syntax remains separate codegen work (#3). This function retains the
+/// [`AsyncSlice`] (or declare one with [`crate::async_template!`]) and use
+/// [`render_incremental`]. This function retains the
 /// fully buffered behavior for existing synchronous slices.
 pub async fn render_async(
     slice: &(impl Slice + ?Sized),

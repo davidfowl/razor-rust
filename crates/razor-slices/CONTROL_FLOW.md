@@ -63,7 +63,9 @@ The renderer is still `move` + `Fn`: iterate `&owned_values` or
 Iterating a captured owned `Vec` by value is rejected rather than making the
 template one-shot. Captured borrowed models cannot escape their lifetime;
 mutable captured borrows are not supported. This is a typed Rust factory, not a
-new model declaration DSL.
+new model declaration DSL. For separately declared typed async templates using
+this recursive body grammar, see [async-templates.md](../../docs/async-templates.md);
+the synchronous capture contract described here is unchanged.
 
 Generated branch and loop writes use the same fallible write path as top-level
 parts. The first failed literal, value or child stops the render immediately,
@@ -91,7 +93,8 @@ Razor parsing, C# syntax or byte-identical .NET encoder/lifecycle behavior.
 The sample deliberately adds grouping and empty lists to exercise nesting.
 Its due dates are deterministic text, not culture-sensitive `DateOnly` values.
 
-Declarations/advanced syntax/async codegen remain #3, layouts/sections #4,
+Typed async declaration/await syntax is the separate #58 milestone under #3;
+advanced syntax remains #3, layouts/sections #4,
 async/context-aware partials #5, HTTP integration #6, streaming #11, benchmarks
 and broader samples #8. Conditional attribute semantics and upstream CSS/layout
 are not implemented here. Shared README/ADR/index and unrelated worker files

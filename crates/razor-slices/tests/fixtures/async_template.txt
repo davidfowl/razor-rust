@@ -1,0 +1,5 @@
+prefix-before-await: <h1>&lt;Todos&gt;</h1>
+prefix-before-await: <h1>&lt;Todos&gt;</h1>
+page: <h1>&lt;Todos&gt;</h1>
+<p>&lt;loaded&gt;</p><ul><li>Read &amp; learn</li><li><s>Ship &lt;Rust&gt;</s><small>&quot;done&quot;</small></li></ul>
+renders: 2

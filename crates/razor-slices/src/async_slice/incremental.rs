@@ -13,7 +13,8 @@ use crate::encode_html_to_writer;
 /// templates can call [`AsyncSlice::render_into`] on the same output directly.
 ///
 /// This statically dispatched trait is not object-safe. Its futures are `Send`;
-/// it does not alter the synchronous [`crate::Slice`] contract or macro grammar.
+/// it does not alter the synchronous [`crate::Slice`] contract or `html!` grammar.
+/// [`crate::async_template!`] generates reusable implementations of this trait.
 /// Repeated renders execute the implementation again. Implementations own any
 /// state or side effects; the runtime does not cache output or reset model state.
 pub trait AsyncSlice: Sync {
