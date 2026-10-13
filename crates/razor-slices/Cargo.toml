@@ -23,4 +23,8 @@ tokio = { version = "1", features = ["io-util"], optional = true }
 memchr = "2"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt", "io-util"] }
+tokio = { version = "1", features = ["macros", "rt", "io-util", "sync"] }
+
+[[example]]
+name = "incremental"
+required-features = ["tokio"]
