@@ -66,6 +66,19 @@ pub trait Slice {
         }
     }
 
+    /// Renders a named section directly to a byte writer at its insertion point.
+    ///
+    /// Names are nonempty and case-sensitive. The default writes nothing for
+    /// an unknown section, matching upstream's optional section execution.
+    /// Use [`crate::with_section`] to associate reusable section slices, and
+    /// [`crate::section()`] to insert them in [`crate::html!`].
+    ///
+    /// Implementations must reject empty names, propagate errors and avoid
+    /// implicitly flushing the destination. Output may be partial on failure.
+    fn render_section_to_writer(&self, name: &str, _writer: &mut dyn io::Write) -> io::Result<()> {
+        crate::section::validate_name(name)
+    }
+
     /// Renders the template to an owned [`String`].
     fn render_to_string(&self) -> Result<String, RenderError> {
         let mut out = String::new();
@@ -98,6 +111,10 @@ impl<S: Slice + ?Sized> Slice for &S {
     fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         (**self).render_to_writer(writer)
     }
+
+    fn render_section_to_writer(&self, name: &str, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).render_section_to_writer(name, writer)
+    }
 }
 
 impl<S: Slice + ?Sized> Slice for Box<S> {
@@ -107,6 +124,10 @@ impl<S: Slice + ?Sized> Slice for Box<S> {
 
     fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         (**self).render_to_writer(writer)
+    }
+
+    fn render_section_to_writer(&self, name: &str, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).render_section_to_writer(name, writer)
     }
 }
 
