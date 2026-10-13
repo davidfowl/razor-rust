@@ -68,8 +68,11 @@ and where typical HTML templates spend most of their bytes (static markup,
 with escapes concentrated at a minority of interpolation points).
 
 `write_encoded` (shared by both `encode_html_to` and `encode_html_to_writer`)
-now uses `next_escape` (built on `memchr2`/`memchr3`) to find the next
-escaped byte's index directly, instead of iterating byte-by-byte. The public
+uses `escape_indices` to merge the ordered matches from `memchr3_iter` and
+`memchr2_iter`. Each iterator advances monotonically over the input; its
+next match (including exhaustion) is cached while the other iterator
+advances. Each group therefore scans the input at most once, keeping total
+search work linear even when one group is absent or sparse. The public
 API and encoded output are unchanged; this is purely an internal
 scanning-strategy swap, verified by the existing encoder test suite (plus
 new cases for consecutive escapes, escapes at the start/end of input, and
@@ -80,21 +83,34 @@ avoided: its dependency tree pulls in a `clap_builder` version requiring
 Cargo's unstable `edition2024` feature, which breaks the `msrv` CI job's
 `cargo build --workspace --all-targets` step on the pinned 1.75 toolchain.
 
+The original implementation in #19 used two fresh searches over the entire
+remaining suffix for every escape. Its
 `cargo run -p razor-slices --example html_encode_bench --release` (x86_64,
-AVX2) shows the new scan is **17.8x faster** on an 8 KB payload with no
-escapes, and **3.3x faster** on an 8 KB payload with sparse escapes (one
-every 512 bytes — closer to typical template content), but **regresses**
+AVX2) measurements showed the scan was **17.8x faster** on an 8 KB payload
+with no escapes, and **3.3x faster** on an 8 KB payload with sparse escapes
+(one every 512 bytes — closer to typical template content), but **regressed**
 on pathologically escape-dense payloads (one escape every 8 bytes: ~6x
-*slower*, and a small ~32-byte payload with an escape every 8 bytes is
-~1.5x slower). This is expected: each `next_escape` call does two `memchr`
-sub-scans, and that fixed per-call overhead dominates when runs between
-escapes are too short for the SIMD skip-ahead to pay for itself. Real HTML
-content (templates are mostly static markup, with escapes concentrated at
-a minority of interpolated-value boundaries) looks like the sparse/no-
-escape cases, not the dense one, so this is judged an acceptable tradeoff —
-flagged here and in the PR's "known gaps" as a follow-up if a pathological
-workload is ever reported in practice (e.g. a hybrid that falls back to the
-scalar scan below some run-length threshold).
+*slower*, and a small ~32-byte payload with an escape every 8 bytes was
+~1.5x slower).
+
+The follow-up [#22](https://github.com/davidfowl/razor-rust/issues/22) identified
+the cause as repeated suffix scanning, not just per-call overhead: when
+one group has no matches, its search walks the whole remaining suffix
+again for every match in the other group. The iterator merge removes that
+quadratic behavior without changing the accepted dependency or API choice.
+The existing benchmark now checks encoded output against the scalar
+baseline and includes angle/ampersand-only, quote-only, and mixed-group
+inputs, with 4/16/64 KiB cases to expose scaling.
+
+One local release run of those one-group dense cases measured the original
+scan at 6.10/18.69/72.75 ns per input byte for angle/ampersand escapes and
+8.90/25.83/97.90 ns per byte for quote escapes. With monotonic iterators,
+the same cases measured 1.52/1.46/1.45 and 1.55/1.78/1.45 ns per byte,
+respectively. Sparse 8 KiB inputs improved from 0.214 to 0.073 ns per byte;
+escape-free inputs stayed near 0.05 ns per byte. These are manual,
+machine-specific measurements, not portable performance guarantees. Short
+escape-heavy inputs can still be slower than the scalar baseline; no
+adaptive threshold or new primitive-formatting strategy is introduced.
 
 ## Consequences
 

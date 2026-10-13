@@ -50,13 +50,13 @@ fn scalar_encode_html_to_writer(value: &str, out: &mut Vec<u8>) {
 
 /// Builds a payload of roughly `len` bytes of plain text with an escaped
 /// character inserted every `escape_every` bytes (`0` = no escapes).
-fn make_payload(len: usize, escape_every: usize) -> String {
+fn make_payload(len: usize, escape_every: usize, escapes: &[u8]) -> String {
     let mut s = String::with_capacity(len);
     let filler = "the quick brown fox jumps over the lazy dog ";
     let mut filler_iter = filler.chars().cycle();
     while s.len() < len {
         if escape_every > 0 && s.len() % escape_every == 0 {
-            s.push('<');
+            s.push(escapes[(s.len() / escape_every) % escapes.len()] as char);
         } else {
             s.push(filler_iter.next().unwrap());
         }
@@ -73,29 +73,45 @@ fn time_iters(iters: u32, mut f: impl FnMut()) -> std::time::Duration {
 }
 
 fn main() {
-    let cases: &[(&str, usize, usize)] = &[
-        ("short_no_escapes_32b", 32, 0),
-        ("short_with_escapes_32b", 32, 8),
-        ("long_no_escapes_8kb", 8192, 0),
-        ("long_sparse_escapes_8kb", 8192, 512),
-        ("long_dense_escapes_8kb", 8192, 8),
+    let cases: &[(&str, usize, usize, &[u8])] = &[
+        ("short_no_escapes_32b", 32, 0, b"<"),
+        ("short_with_escapes_32b", 32, 8, b"<"),
+        ("long_no_escapes_8kb", 8192, 0, b"<"),
+        ("long_sparse_escapes_8kb", 8192, 512, b"<"),
+        ("long_dense_escapes_8kb", 8192, 8, b"<"),
+        ("long_quotes_only_8kb", 8192, 8, b"\"'"),
+        ("angle_dense_4kb", 4096, 8, b"<>&"),
+        ("angle_dense_16kb", 16384, 8, b"<>&"),
+        ("angle_dense_64kb", 65536, 8, b"<>&"),
+        ("quotes_dense_4kb", 4096, 8, b"\"'"),
+        ("quotes_dense_16kb", 16384, 8, b"\"'"),
+        ("quotes_dense_64kb", 65536, 8, b"\"'"),
+        ("mixed_dense_8kb", 8192, 8, b"<>&\"'"),
     ];
 
-    const ITERS: u32 = 20_000;
-
     println!(
-        "{:<28} {:>14} {:>14} {:>10}",
-        "case", "memchr (ms)", "scalar (ms)", "speedup"
+        "{:<28} {:>8} {:>14} {:>14} {:>12} {:>10}",
+        "case", "iters", "memchr (ms)", "scalar (ms)", "memchr ns/B", "speedup"
     );
-    for &(name, len, escape_every) in cases {
-        let payload = make_payload(len, escape_every);
+    for &(name, len, escape_every, escapes) in cases {
+        let payload = make_payload(len, escape_every, escapes);
+        let iters = if name.contains("_dense_") {
+            2_000
+        } else {
+            20_000
+        };
+        let mut expected = Vec::new();
+        scalar_encode_html_to_writer(&payload, &mut expected);
+        let mut actual = Vec::new();
+        encode_html_to_writer(&payload, &mut actual).unwrap();
+        assert_eq!(actual, expected, "{name}");
 
-        let memchr_time = time_iters(ITERS, || {
+        let memchr_time = time_iters(iters, || {
             let mut out = Vec::with_capacity(payload.len());
             encode_html_to_writer(&payload, &mut out).unwrap();
             std::hint::black_box(&out);
         });
-        let scalar_time = time_iters(ITERS, || {
+        let scalar_time = time_iters(iters, || {
             let mut out = Vec::with_capacity(payload.len());
             scalar_encode_html_to_writer(&payload, &mut out);
             std::hint::black_box(&out);
@@ -103,10 +119,12 @@ fn main() {
 
         let speedup = scalar_time.as_secs_f64() / memchr_time.as_secs_f64();
         println!(
-            "{:<28} {:>14.2} {:>14.2} {:>9.2}x",
+            "{:<28} {:>8} {:>14.2} {:>14.2} {:>12.3} {:>9.2}x",
             name,
+            iters,
             memchr_time.as_secs_f64() * 1000.0,
             scalar_time.as_secs_f64() * 1000.0,
+            memchr_time.as_secs_f64() * 1e9 / (iters as f64 * len as f64),
             speedup
         );
     }

@@ -46,7 +46,7 @@ impl From<&str> for HtmlString {
 /// or lead byte for a multi-byte character ever equals an ASCII byte value,
 /// so scanning the raw UTF-8 byte representation of a `&str` for these bytes
 /// (rather than decoding `char`s) is always safe and never splits a
-/// multi-byte sequence. See [`next_escape`] for how the scan itself works.
+/// multi-byte sequence. See [`escape_indices`] for how the scan itself works.
 #[inline]
 fn escape_entity(b: u8) -> &'static str {
     match b {
@@ -59,26 +59,26 @@ fn escape_entity(b: u8) -> &'static str {
     }
 }
 
-/// Returns the index of the next byte in `bytes` that needs escaping, or
-/// `None` if there isn't one.
+/// Yields the indices of escaped bytes in ascending order.
 ///
 /// Delegates to [`memchr`]'s SIMD-accelerated (SSE2/AVX2 on x86_64, NEON on
 /// aarch64, with a scalar fallback elsewhere) byte search instead of
 /// testing one byte at a time. `memchr` only supports needles of up to 3
 /// distinct bytes, so the 5 escaped bytes (`& < > " '`) are split into two
-/// sub-scans — `memchr3` for `& < >` and `memchr2` for `" '` — and the
-/// nearer match (if either) is returned. See ADR
+/// monotonic scans, merging their matches without rescanning suffixes
+/// when one group is absent or sparse. See ADR
 /// [0005](../../docs/adr/0005-simd-html-encoding.md).
 #[inline]
-fn next_escape(bytes: &[u8]) -> Option<usize> {
-    let angle_amp = memchr::memchr3(b'&', b'<', b'>', bytes);
-    let quotes = memchr::memchr2(b'"', b'\'', bytes);
-    match (angle_amp, quotes) {
-        (Some(a), Some(q)) => Some(a.min(q)),
-        (Some(a), None) => Some(a),
-        (None, Some(q)) => Some(q),
+fn escape_indices(bytes: &[u8]) -> impl Iterator<Item = usize> + '_ {
+    let mut angle_amp = memchr::memchr3_iter(b'&', b'<', b'>', bytes).peekable();
+    let mut quotes = memchr::memchr2_iter(b'"', b'\'', bytes).peekable();
+    std::iter::from_fn(move || match (angle_amp.peek(), quotes.peek()) {
+        (Some(a), Some(q)) if a < q => angle_amp.next(),
+        (Some(_), Some(_)) => quotes.next(),
+        (Some(_), None) => angle_amp.next(),
+        (None, Some(_)) => quotes.next(),
         (None, None) => None,
-    }
+    })
 }
 
 /// Walks `bytes` emitting the longest possible runs of non-escaped bytes as
@@ -92,8 +92,7 @@ fn write_encoded<E>(
     mut write_all: impl FnMut(&[u8]) -> Result<(), E>,
 ) -> Result<(), E> {
     let mut start = 0;
-    while let Some(offset) = next_escape(&bytes[start..]) {
-        let i = start + offset;
+    for i in escape_indices(bytes) {
         if start < i {
             write_all(&bytes[start..i])?;
         }
@@ -262,14 +261,171 @@ mod tests {
     use super::*;
 
     #[test]
-    fn next_escape_finds_nearest_of_either_memchr_group() {
-        // `>` is in the memchr3(&,<,>) group; `'` is in the memchr2(",')
-        // group. The nearer one (by index) must win regardless of which
-        // sub-scan found it.
-        assert_eq!(next_escape(b"ab>cd'ef"), Some(2));
-        assert_eq!(next_escape(b"ab'cd>ef"), Some(2));
-        assert_eq!(next_escape(b"no escapes here"), None);
-        assert_eq!(next_escape(b""), None);
+    fn escape_indices_merges_both_groups_in_order() {
+        for input in [
+            b"ab>cd'ef".as_slice(),
+            b"ab'cd>ef",
+            b"<>&",
+            b"\"'",
+            b"<\"&'>",
+            b"no escapes here",
+            b"",
+        ] {
+            let expected: Vec<_> = input
+                .iter()
+                .enumerate()
+                .filter_map(|(i, b)| matches!(b, b'&' | b'<' | b'>' | b'"' | b'\'').then_some(i))
+                .collect();
+            assert_eq!(escape_indices(input).collect::<Vec<_>>(), expected);
+        }
+    }
+
+    fn scalar_encode(value: &str) -> String {
+        let mut out = String::new();
+        for c in value.chars() {
+            match c {
+                '&' => out.push_str("&amp;"),
+                '<' => out.push_str("&lt;"),
+                '>' => out.push_str("&gt;"),
+                '"' => out.push_str("&quot;"),
+                '\'' => out.push_str("&#39;"),
+                _ => out.push(c),
+            }
+        }
+        out
+    }
+
+    fn assert_both_encoders(value: &str) {
+        let expected = scalar_encode(value);
+        let mut text = String::new();
+        encode_html_to(value, &mut text).unwrap();
+        let mut bytes = Vec::new();
+        encode_html_to_writer(value, &mut bytes).unwrap();
+        assert_eq!(text, expected);
+        assert_eq!(bytes, expected.as_bytes());
+    }
+
+    #[test]
+    fn encoders_match_scalar_for_ascii_and_unicode_boundaries() {
+        for b in 0..=127u8 {
+            assert_both_encoders(&format!("before{}after", b as char));
+        }
+        for len in [0, 1, 15, 16, 31, 32, 63, 64, 127, 4096] {
+            for escapes in ["<>&", "\"'", "<\"&'>", "'>&\"<"] {
+                let safe = "é日本語🦀".repeat(len);
+                assert_both_encoders(&format!("{escapes}{safe}{escapes}{safe}"));
+                assert_both_encoders(&format!("{safe}{escapes}{safe}{escapes}"));
+                assert_both_encoders(&escapes.repeat(len));
+            }
+        }
+    }
+
+    #[test]
+    fn encoders_match_scalar_for_all_short_escape_combinations() {
+        let alphabet = ['a', '&', '<', '>', '"', '\'', 'é', '🦀'];
+        for mut value in 0..alphabet.len().pow(4) {
+            let mut input = String::new();
+            for _ in 0..4 {
+                input.push(alphabet[value % alphabet.len()]);
+                value /= alphabet.len();
+            }
+            assert_both_encoders(&input);
+        }
+    }
+
+    #[test]
+    fn fmt_encoder_preserves_safe_runs_and_stops_at_first_error() {
+        struct Writer {
+            chunks: Vec<String>,
+            attempts: usize,
+            fail_at: usize,
+        }
+        impl fmt::Write for Writer {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                self.attempts += 1;
+                if self.attempts == self.fail_at {
+                    return Err(fmt::Error);
+                }
+                self.chunks.push(s.to_owned());
+                Ok(())
+            }
+        }
+        let chunks = ["abc", "&lt;", "日本語", "&quot;", "tail"];
+        for fail_at in 1..=chunks.len() + 1 {
+            let mut writer = Writer {
+                chunks: Vec::new(),
+                attempts: 0,
+                fail_at,
+            };
+            let result = encode_html_to("abc<日本語\"tail", &mut writer);
+            assert_eq!(result.is_err(), fail_at <= chunks.len());
+            assert_eq!(writer.attempts, fail_at.min(chunks.len()));
+            assert_eq!(writer.chunks, chunks[..fail_at - 1]);
+        }
+    }
+
+    #[test]
+    fn byte_encoder_propagates_first_sink_error() {
+        struct Writer {
+            output: Vec<u8>,
+            attempts: usize,
+            fail_at: usize,
+        }
+        impl io::Write for Writer {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.attempts += 1;
+                if self.attempts == self.fail_at {
+                    return Err(io::Error::new(io::ErrorKind::BrokenPipe, "test sink"));
+                }
+                self.output.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                panic!("encoding must not flush")
+            }
+        }
+        let chunks = ["abc", "&lt;", "日本語", "&quot;", "tail"];
+        for fail_at in 1..=chunks.len() {
+            let mut writer = Writer {
+                output: Vec::new(),
+                attempts: 0,
+                fail_at,
+            };
+            let error = encode_html_to_writer("abc<日本語\"tail", &mut writer).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+            assert_eq!(error.to_string(), "test sink");
+            assert_eq!(writer.attempts, fail_at);
+            assert_eq!(writer.output, chunks[..fail_at - 1].concat().as_bytes());
+        }
+    }
+
+    #[test]
+    fn byte_encoder_handles_short_writes_and_interrupted_io() {
+        struct Writer {
+            output: Vec<u8>,
+            interrupted: bool,
+        }
+        impl io::Write for Writer {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if !self.interrupted {
+                    self.interrupted = true;
+                    return Err(io::ErrorKind::Interrupted.into());
+                }
+                let len = bytes.len().min(2);
+                self.output.extend_from_slice(&bytes[..len]);
+                Ok(len)
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                panic!("encoding must not flush")
+            }
+        }
+        let input = "é日本語<\"&'>tail";
+        let mut writer = Writer {
+            output: Vec::new(),
+            interrupted: false,
+        };
+        encode_html_to_writer(input, &mut writer).unwrap();
+        assert_eq!(writer.output, scalar_encode(input).as_bytes());
     }
 
     #[test]

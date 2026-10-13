@@ -25,6 +25,9 @@ rendering — without pulling in a full web/MVC framework.
   UTF-8 directly to any `std::io::Write` sink (no intermediate `String`), and
   `WriteHtmlValue` formats numbers/bools into a stack buffer instead of
   allocating — see [#10](https://github.com/davidfowl/razor-rust/issues/10).
+  HTML escape detection uses monotonic SIMD-backed scans, keeping search
+  work linear even for escape-heavy inputs (see
+  [ADR 0005](docs/adr/0005-simd-html-encoding.md)).
 - CI on GitHub Actions: build, test, `clippy`, `rustfmt`, `cargo doc` (deny
   warnings), and MSRV (1.75) build/test checks on every PR. Build, test,
   lint, and docs cover both default features and `--all-features`, including
