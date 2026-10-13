@@ -59,6 +59,8 @@ jobs:
           diff -u crates/razor-slices/tests/fixtures/sections.html target/sections-output.html
           cargo run -p razor-slices --example declared_layout > target/declared-layout-output.html
           diff -u crates/razor-slices/tests/fixtures/declared-layout.html target/declared-layout-output.html
+          cargo run -p razor-slices --example integration > target/integration-output.html
+          diff -u crates/razor-slices/tests/fixtures/integration.html target/integration-output.html
 
       - name: Verify incremental section example
         if: matrix.features == 'all-features'
@@ -127,3 +129,8 @@ jobs:
       - name: Test renamed runtime dependency with MSRV
         if: matrix.features == 'default'
         run: cargo test --manifest-path crates/razor-slices/tests/renamed/Cargo.toml
+
+      - name: Verify integrated sample with MSRV
+        run: |
+          cargo run -p razor-slices --example integration ${{ matrix.cargo-flags }} > target/integration-output.html
+          diff -u crates/razor-slices/tests/fixtures/integration.html target/integration-output.html

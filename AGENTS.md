@@ -14,7 +14,9 @@ do not duplicate work already in progress.
 | --- | --- |
 | [Cargo.toml](Cargo.toml) | Workspace membership and shared package metadata, including MSRV |
 | [rust-toolchain.toml](rust-toolchain.toml) | Default development toolchain: stable |
-| [crates/razor-slices/](crates/razor-slices/) | The only workspace crate today: rendering runtime |
+| [crates/razor-slices/](crates/razor-slices/) | Rendering runtime, model factories and executable template samples |
+| [crates/razor-slices-macros/](crates/razor-slices-macros/) | Inline template parser and code generation |
+| [crates/razor-slices-axum/](crates/razor-slices-axum/) | Buffered and bounded streaming HTTP responses and real HTTP tests |
 | [src/lib.rs](crates/razor-slices/src/lib.rs) | Public runtime exports |
 | [src/slice.rs](crates/razor-slices/src/slice.rs) | Synchronous `Slice`, render errors, reference/box implementations, and unit tests |
 | [src/html.rs](crates/razor-slices/src/html.rs) | Shared HTML encoding, `HtmlString`, `WriteHtmlValue`, and unit tests |
@@ -33,8 +35,9 @@ do not duplicate work already in progress.
   the runtime.
 - `render_async` currently calls `render_to_bytes`, buffers the whole output,
   then calls the destination's `write_all` and `flush`. It is an async I/O
-  bridge, not incremental mid-template streaming. That remaining work is
-  tracked in [#11](https://github.com/davidfowl/razor-rust/issues/11).
+  bridge, not incremental mid-template streaming. The separate `AsyncSlice`,
+  `AsyncHtmlWriter` and `render_incremental` path writes incrementally and
+  supports mid-template flush and explicit lazy async sections.
 - `AsyncSliceWriter` is runtime-agnostic. The default-off `tokio` feature adds
   `TokioWriter`; the core has no mandatory async-runtime dependency. Tokio is
   also a dev-dependency for tests, which does not make the adapter available
@@ -44,14 +47,24 @@ do not duplicate work already in progress.
   encoded; `HtmlString` is for already-safe HTML emitted verbatim. Preserve
   UTF-8, the five escaped characters (`&`, `<`, `>`, `"`, `'`), and writer
   error propagation when working here.
-- Template syntax, codegen, and model contracts are tracked in
-  [#3](https://github.com/davidfowl/razor-rust/issues/3). There is no macro or
-  codegen crate in the workspace yet. Layouts
-  ([#4](https://github.com/davidfowl/razor-rust/issues/4)), partials
-  ([#5](https://github.com/davidfowl/razor-rust/issues/5)), and web integration
-  ([#6](https://github.com/davidfowl/razor-rust/issues/6)) are roadmap items,
-  not implemented features. Do not turn a proposed ADR or an issue example
-  into an accepted public API decision.
+- Inline `html!` generates reusable slices with nested conditionals/loops.
+  Partials, conditional attributes, layouts and named sections are implemented
+  in this source. Declared layouts bypass full-document rendering when used
+  as children, but explicitly composed documents remain composed. Preserve
+  body/section dispatch and all convenience overrides through references
+  and boxes; avoid fixing one path while dropping another.
+- Axum has distinct buffered/streaming contracts. Buffered failures return
+  clean 500 responses; streaming failures propagate body errors after selected
+  headers and cannot replace already-started responses. The body owns its
+  renderer and bounded frames, with no spawned producer.
+- This integration preview assembles unmerged deliveries, not a released
+  full port. Generated async templates remain tracked in
+  [#3](https://github.com/davidfowl/razor-rust/issues/3); inherited/async layout
+  context, request lifetime and broader parity remain #47/#52/#11.
+  See [docs/integration.md](docs/integration.md) for exact source dependencies.
+  Do not turn a proposed ADR or issue example into an accepted public API
+  decision. Later owner-delegated reversible implementation choices do not
+  imply explicit maintainer approval of every API.
 
 ## Development and verification
 
