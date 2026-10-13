@@ -10,14 +10,19 @@ use axum::{
     routing::get,
     Router,
 };
-use http_body_util::BodyExt;
-use razor_slices::{html, HtmlString, Slice, WriteHtmlValue};
-use razor_slices_axum::SliceResponse;
+use http_body_util::{BodyExt, Empty};
+use razor_slices::{
+    html, AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter, HtmlString, Slice,
+    WriteHtmlValue,
+};
+use razor_slices_axum::{SliceResponse, StreamingSliceResponse};
 use tower::ServiceExt;
 use tracing::instrument::WithSubscriber;
 
 #[path = "../examples/support/page.rs"]
 mod page;
+#[path = "../examples/support/streaming.rs"]
+mod streaming_sample;
 
 async fn body(response: axum::response::Response) -> Vec<u8> {
     response
@@ -242,4 +247,369 @@ async fn empty_slice_has_successful_html_response() {
         "text/html; charset=utf-8"
     );
     assert!(body(response).await.is_empty());
+}
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+fn rendering_error<'a>(mut error: &'a (dyn std::error::Error + 'static)) -> &'a AsyncRenderError {
+    loop {
+        if let Some(error) = error.downcast_ref::<AsyncRenderError>() {
+            return error;
+        }
+        error = error
+            .source()
+            .expect("HTTP body must retain the rendering error in its source chain");
+    }
+}
+
+struct CountedPage {
+    started: Arc<AtomicUsize>,
+    completed: Arc<AtomicUsize>,
+    dropped: Arc<AtomicUsize>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+impl Drop for CountedPage {
+    fn drop(&mut self) {
+        self.dropped.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl AsyncSlice for CountedPage {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        self.started.fetch_add(1, Ordering::SeqCst);
+        output.write_literal("prefix").await?;
+        output.flush().await?;
+        self.release.notified().await;
+        self.completed.fetch_add(1, Ordering::SeqCst);
+        output.write_value("<tail>").await?;
+        Ok(())
+    }
+}
+
+fn counted_page() -> CountedPage {
+    CountedPage {
+        started: Arc::new(AtomicUsize::new(0)),
+        completed: Arc::new(AtomicUsize::new(0)),
+        dropped: Arc::new(AtomicUsize::new(0)),
+        release: Arc::new(tokio::sync::Notify::new()),
+    }
+}
+
+#[tokio::test]
+async fn streaming_conversion_is_lazy_and_prefix_precedes_later_application_await() {
+    let page = counted_page();
+    let started = page.started.clone();
+    let completed = page.completed.clone();
+    let release = page.release.clone();
+    let response = StreamingSliceResponse::new(page)
+        .with_status(StatusCode::CREATED)
+        .into_response();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    assert_eq!(
+        response.headers()["content-type"],
+        "text/html; charset=utf-8"
+    );
+    assert!(!response.headers().contains_key("content-length"));
+    assert_eq!(started.load(Ordering::SeqCst), 0);
+    let mut output = response.into_body();
+    let prefix = output.frame().await.unwrap().unwrap().into_data().unwrap();
+    assert_eq!(prefix, b"prefix".as_slice());
+    assert_eq!(started.load(Ordering::SeqCst), 1);
+    assert_eq!(completed.load(Ordering::SeqCst), 0);
+    release.notify_one();
+    assert_eq!(
+        output.collect().await.unwrap().to_bytes(),
+        b"&lt;tail&gt;".as_slice()
+    );
+    assert_eq!(completed.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn dropping_stream_cancels_polling_of_renderer_and_application_await() {
+    let page = counted_page();
+    let completed = page.completed.clone();
+    let dropped = page.dropped.clone();
+    let release = page.release.clone();
+    let mut output = StreamingSliceResponse::new(page)
+        .into_response()
+        .into_body();
+    assert_eq!(
+        output.frame().await.unwrap().unwrap().into_data().unwrap(),
+        b"prefix".as_slice()
+    );
+    drop(output);
+    assert_eq!(dropped.load(Ordering::SeqCst), 1);
+    release.notify_one();
+    tokio::task::yield_now().await;
+    assert_eq!(completed.load(Ordering::SeqCst), 0);
+}
+
+struct LargePage {
+    text: String,
+    completed: Arc<AtomicUsize>,
+}
+
+impl AsyncSlice for LargePage {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        output.write_literal(&self.text).await?;
+        self.completed.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn streaming_frames_are_bounded_and_slow_consumers_hold_render_work() {
+    let completed = Arc::new(AtomicUsize::new(0));
+    let text = "雪<&>".repeat(2_000);
+    let page = LargePage {
+        text: text.clone(),
+        completed: completed.clone(),
+    };
+    let mut output = StreamingSliceResponse::new(page)
+        .into_response()
+        .into_body();
+    let first = output.frame().await.unwrap().unwrap().into_data().unwrap();
+    assert_eq!(first.len(), 1_024);
+    assert_eq!(completed.load(Ordering::SeqCst), 0);
+    tokio::task::yield_now().await;
+    assert_eq!(completed.load(Ordering::SeqCst), 0);
+    let mut bytes = first.to_vec();
+    while let Some(frame) = output.frame().await {
+        let bytes_frame = frame.unwrap().into_data().unwrap();
+        assert!(!bytes_frame.is_empty());
+        assert!(bytes_frame.len() <= 1_024);
+        bytes.extend_from_slice(&bytes_frame);
+    }
+    assert_eq!(bytes, text.as_bytes());
+    assert_eq!(completed.load(Ordering::SeqCst), 1);
+}
+
+struct StreamingFailure;
+impl AsyncSlice for StreamingFailure {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        output.write_literal("prefix").await?;
+        Err(io::Error::new(io::ErrorKind::PermissionDenied, OriginalError).into())
+    }
+}
+
+#[tokio::test]
+async fn streaming_failure_logs_original_source_and_is_an_error_not_successful_eof() {
+    let logs = Logs(Arc::new(Mutex::new(Vec::new())));
+    let subscriber = tracing_subscriber::fmt()
+        .without_time()
+        .with_ansi(false)
+        .with_writer(logs.clone())
+        .finish();
+    async {
+        let response = StreamingSliceResponse::new(StreamingFailure)
+            .with_status(StatusCode::CREATED)
+            .into_response();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let mut output = response.into_body();
+        assert_eq!(
+            output.frame().await.unwrap().unwrap().into_data().unwrap(),
+            b"prefix".as_slice()
+        );
+        let error = output.frame().await.unwrap().unwrap_err();
+        match rendering_error(&error) {
+            AsyncRenderError::Write(error) => {
+                assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+                assert!(error.get_ref().unwrap().is::<OriginalError>());
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+        assert!(output.frame().await.is_none());
+    }
+    .with_subscriber(subscriber)
+    .await;
+    let recorded = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
+    assert!(recorded.contains("streaming slice response rendering failed"));
+    assert!(recorded.contains("original value error"));
+    assert!(recorded.contains("PermissionDenied"));
+    assert_eq!(
+        recorded
+            .matches("streaming slice response rendering failed")
+            .count(),
+        1
+    );
+}
+
+struct EarlyFailure;
+impl AsyncSlice for EarlyFailure {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        _: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        Err(razor_slices::RenderError(fmt::Error).into())
+    }
+}
+
+#[tokio::test]
+async fn failure_before_first_write_is_still_a_body_error_and_not_a_buffered_500() {
+    let response = StreamingSliceResponse::new(EarlyFailure).into_response();
+    assert_eq!(response.status(), StatusCode::OK);
+    let error = response.into_body().collect().await.unwrap_err();
+    assert!(matches!(
+        rendering_error(&error),
+        AsyncRenderError::Render(_)
+    ));
+}
+
+struct EmptyAsync;
+impl AsyncSlice for EmptyAsync {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        _: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn empty_async_template_has_html_status_and_clean_eof() {
+    let response = StreamingSliceResponse::new(EmptyAsync).into_response();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()["content-type"],
+        "text/html; charset=utf-8"
+    );
+    assert!(body(response).await.is_empty());
+}
+
+#[tokio::test]
+async fn runnable_streaming_error_route_fails_its_body_without_error_html() {
+    let app = streaming_sample::app(Arc::new(tokio::sync::Notify::new()));
+    let response = app
+        .oneshot(Request::get("/error").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()["content-type"],
+        "text/html; charset=utf-8"
+    );
+    let error = response.into_body().collect().await.unwrap_err();
+    match rendering_error(&error) {
+        AsyncRenderError::Write(error) => {
+            assert_eq!(error.to_string(), "deliberate streaming failure")
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn head_strips_stream_without_starting_the_owned_renderer() {
+    let page = counted_page();
+    let started = page.started.clone();
+    let dropped = page.dropped.clone();
+    let page = Arc::new(Mutex::new(Some(page)));
+    let app = Router::new().route(
+        "/",
+        get(move || {
+            let page = page.lock().unwrap().take().unwrap();
+            async move { StreamingSliceResponse::new(page).with_status(StatusCode::CREATED) }
+        }),
+    );
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("HEAD")
+                .uri("/")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    assert_eq!(
+        response.headers()["content-type"],
+        "text/html; charset=utf-8"
+    );
+    assert!(body(response).await.is_empty());
+    assert_eq!(started.load(Ordering::SeqCst), 0);
+    assert_eq!(dropped.load(Ordering::SeqCst), 1);
+}
+
+async fn http_client(
+    address: std::net::SocketAddr,
+) -> (
+    hyper::client::conn::http1::SendRequest<Empty<axum::body::Bytes>>,
+    tokio::task::JoinHandle<Result<(), hyper::Error>>,
+) {
+    let socket = tokio::net::TcpStream::connect(address).await.unwrap();
+    let (sender, connection) =
+        hyper::client::conn::http1::handshake(hyper_util::rt::TokioIo::new(socket))
+            .await
+            .unwrap();
+    (sender, tokio::spawn(connection))
+}
+
+#[tokio::test]
+async fn real_http_prefix_is_received_before_separate_release_request_and_exact_suffix() {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = streaming_sample::app(Arc::new(tokio::sync::Notify::new()));
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let (mut client, connection) = http_client(address).await;
+        let response = client
+            .send_request(
+                Request::builder()
+                    .uri("/stream")
+                    .header("host", address.to_string())
+                    .body(Empty::new())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers()["content-type"],
+            "text/html; charset=utf-8"
+        );
+        let mut output = response.into_body();
+        let prefix = output.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(prefix, b"<p>Loading...</p>\n".as_slice());
+
+        let (mut release_client, release_connection) = http_client(address).await;
+        let released = release_client
+            .send_request(
+                Request::builder()
+                    .method("POST")
+                    .uri("/release")
+                    .header("host", address.to_string())
+                    .body(Empty::new())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(released.status(), StatusCode::NO_CONTENT);
+        assert!(released
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .is_empty());
+        let mut bytes = prefix.to_vec();
+        bytes.extend_from_slice(&output.collect().await.unwrap().to_bytes());
+        assert_eq!(bytes, include_bytes!("fixtures/streaming.html"));
+        connection.abort();
+        release_connection.abort();
+        server.abort();
+    })
+    .await
+    .expect("prefix-before-release HTTP handshake must not deadlock");
 }

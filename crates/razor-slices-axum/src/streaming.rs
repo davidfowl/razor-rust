@@ -55,6 +55,24 @@ const FRAME_SIZE: usize = 1_024;
 /// assert_eq!(response.status(), 200);
 /// assert_eq!(response.headers()["content-type"], "text/html; charset=utf-8");
 /// ```
+///
+/// Borrowed models cannot escape into an owned HTTP body:
+///
+/// ```compile_fail
+/// use razor_slices::{AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter};
+/// use razor_slices_axum::StreamingSliceResponse;
+/// struct Page<'a>(&'a str);
+/// impl AsyncSlice for Page<'_> {
+///     async fn render_into<W: AsyncSliceWriter + Send>(
+///         &self, out: &mut AsyncHtmlWriter<'_, W>,
+///     ) -> Result<(), AsyncRenderError> {
+///         out.write_value(self.0).await?;
+///         Ok(())
+///     }
+/// }
+/// let title = String::from("Title");
+/// let _ = StreamingSliceResponse::new(Page(&title));
+/// ```
 #[must_use]
 pub struct StreamingSliceResponse<S> {
     slice: S,

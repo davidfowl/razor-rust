@@ -1,13 +1,20 @@
-# Buffered Axum integration
+# Axum integration
 
 `SliceResponse<S>` implements Axum 0.7's `IntoResponse` for any synchronous
 `Slice`, including inline templates, handwritten slices, references and boxes.
 The separate crate leaves the core runtime framework-independent.
 
+`StreamingSliceResponse<S>` adds owned incremental async HTTP output. See
+[STREAMING.md](STREAMING.md) for the runnable prefix-before-release server,
+bounded frames/backpressure, body-drop cancellation and post-start errors.
+The buffered contract below remains unchanged.
+
 This branch stacks on **unmerged PR #33** at
 `abeaad6d3a8648e8f7bfe2d166d2d3716da6a1fc`, including its PR #31 commits.
 The model-driven inline/partial API is not on main yet. Integrate those PRs
 before this one; no edits to their delivered branches are required.
+The streaming milestone additionally assembles #40 and unmerged #38; its
+exact dependency versions/integration order are disclosed in STREAMING.md.
 
 ## Contract
 
@@ -103,7 +110,9 @@ workspace Rust 1.75 MSRV. The dev-only hyper-util pin avoids its newer
 Rust-1.85/edition-2024 releases. The committed workspace lockfile (format 3)
 also retains a compatible optional backtrace graph. The library's normal
 Axum dependency has default features disabled; HTTP server/runtime features
-are dev-only. No dependency on the core's Tokio adapter or PR #38 is needed.
+are dev-only. The buffered adapter does not use the core's Tokio adapter. The additive
+streaming adapter uses PR #38's incremental contract and Tokio's bounded
+`sync` channel, without enabling a production executor/server feature.
 Downstream applications own their framework/runtime dependency resolution.
 
 ## C# parity and deliberate limits
@@ -122,8 +131,9 @@ Upstream starts the HTTP response **before** async rendering and final flush.
 This adapter intentionally buffers **before** response commitment so ordinary
 rendering/UTF-8 failures can return a clean 500. It is not equivalent in
 streaming, time-to-first-byte, cancellation, or post-start failure behavior.
-No flush-as-you-go HTTP support is delivered: that remains #6/#11; PR #38's
-incremental writer contract is independently owned.
+The separate incremental adapter now supplies streaming HTTP support with
+bounded output and drop-based cancellation; see STREAMING.md for the tested
+behavior and the remaining #6/#11 token/lifecycle/transport limits.
 
 Rendering is synchronous on the calling thread, with memory proportional
 to the complete page and no built-in output cap. Bound input/output sizes and
