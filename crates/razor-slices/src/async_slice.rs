@@ -225,6 +225,72 @@ mod tests {
         assert!(writer.flushed);
     }
 
+    struct BytesOverride;
+
+    impl Slice for BytesOverride {
+        fn render(&self, _: &mut dyn fmt::Write) -> fmt::Result {
+            Err(fmt::Error)
+        }
+
+        fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+            Ok("bytes override: \u{e9}".as_bytes().to_vec())
+        }
+    }
+
+    #[test]
+    fn render_async_preserves_byte_overrides_through_wrappers() {
+        fn assert_bytes<S: Slice>(slice: S) {
+            let mut writer = VecWriter {
+                buf: Vec::new(),
+                flushed: false,
+            };
+            block_on(render_async(&slice, &mut writer)).unwrap();
+            assert_eq!(writer.buf, "bytes override: \u{e9}".as_bytes());
+            assert!(writer.flushed);
+        }
+
+        assert_bytes(&BytesOverride);
+        assert_bytes(Box::new(BytesOverride));
+        let by_ref: &dyn Slice = &BytesOverride;
+        assert_bytes(by_ref);
+        let boxed: Box<dyn Slice> = Box::new(BytesOverride);
+        assert_bytes(&boxed);
+        assert_bytes(boxed);
+    }
+
+    #[test]
+    fn render_async_preserves_wrapped_render_errors_without_writing() {
+        struct FailingBytesOverride;
+
+        impl Slice for FailingBytesOverride {
+            fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+                writer.write_str("render succeeds")
+            }
+
+            fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+                Err(RenderError(fmt::Error))
+            }
+        }
+
+        fn assert_error<S: Slice>(slice: S) {
+            let mut writer = VecWriter {
+                buf: Vec::new(),
+                flushed: false,
+            };
+            assert!(matches!(
+                block_on(render_async(&slice, &mut writer)),
+                Err(AsyncRenderError::Render(_))
+            ));
+            assert!(writer.buf.is_empty());
+            assert!(!writer.flushed);
+        }
+
+        assert_error(&FailingBytesOverride);
+        let boxed: Box<dyn Slice> = Box::new(FailingBytesOverride);
+        assert_error(&boxed);
+        assert_error(boxed);
+    }
+
     /// Polls `fut` to completion without a real async runtime/executor.
     ///
     /// Safe to use here because the futures under test never actually

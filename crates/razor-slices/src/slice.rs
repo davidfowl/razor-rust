@@ -143,4 +143,86 @@ mod tests {
         let boxed: Box<dyn Slice> = Box::new(Hello { name: "World" });
         assert_eq!(render_any(&boxed), "<p>Hello, World!</p>");
     }
+
+    struct Overrides;
+
+    impl Slice for Overrides {
+        fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+            writer.write_str("render")
+        }
+
+        fn render_to_string(&self) -> Result<String, RenderError> {
+            Ok("string override".to_owned())
+        }
+
+        fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+            Ok(b"bytes override".to_vec())
+        }
+    }
+
+    fn assert_overrides<S: Slice>(slice: S) {
+        let mut output = String::new();
+        Slice::render(&slice, &mut output).unwrap();
+        assert_eq!(output, "render");
+        assert_eq!(Slice::render_to_string(&slice).unwrap(), "string override");
+        assert_eq!(Slice::render_to_bytes(&slice).unwrap(), b"bytes override");
+    }
+
+    #[test]
+    fn reference_preserves_rendering_overrides() {
+        assert_overrides(&Overrides);
+    }
+
+    #[test]
+    fn box_preserves_rendering_overrides() {
+        assert_overrides(Box::new(Overrides));
+    }
+
+    #[test]
+    fn trait_object_wrappers_preserve_rendering_overrides() {
+        let by_ref: &dyn Slice = &Overrides;
+        assert_overrides(by_ref);
+        let boxed: Box<dyn Slice> = Box::new(Overrides);
+        assert_overrides(boxed);
+    }
+
+    #[test]
+    fn nested_wrappers_preserve_rendering_overrides() {
+        let boxed: Box<dyn Slice> = Box::new(Overrides);
+        assert_overrides(&boxed);
+        assert_overrides(Box::new(Box::new(boxed)));
+        assert_overrides(&&Overrides);
+    }
+
+    struct FailingOverrides;
+
+    impl Slice for FailingOverrides {
+        fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+            writer.write_str("render succeeds")
+        }
+
+        fn render_to_string(&self) -> Result<String, RenderError> {
+            Err(RenderError(fmt::Error))
+        }
+
+        fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+            Err(RenderError(fmt::Error))
+        }
+    }
+
+    #[test]
+    fn wrappers_preserve_errors_from_rendering_overrides() {
+        fn assert_errors<S: Slice>(slice: S) {
+            assert!(Slice::render_to_string(&slice).is_err());
+            assert!(Slice::render_to_bytes(&slice).is_err());
+        }
+
+        assert_errors(&FailingOverrides);
+        assert_errors(Box::new(FailingOverrides));
+        let by_ref: &dyn Slice = &FailingOverrides;
+        assert_errors(by_ref);
+        let boxed: Box<dyn Slice> = Box::new(FailingOverrides);
+        assert_errors(&boxed);
+        assert_errors(boxed);
+    }
 }
