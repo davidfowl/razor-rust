@@ -26,7 +26,9 @@ fn greeting(name: &str) -> impl Slice + '_ {
 
 `html!` returns `InlineSlice<F>`, which implements the existing synchronous
 `Slice` trait. Its grammar is zero or more string literals or `{ expression }`
-parts, with no commas or implicit separators. Raw string literals work too.
+parts, with no commas or implicit separators. Recursive `if`/`else` and `for`
+template bodies are documented in [CONTROL_FLOW.md](CONTROL_FLOW.md).
+Raw string literals work too.
 Literal content, including spaces, newlines and braces, is preserved exactly.
 Outside literals, whitespace only separates Rust tokens. Bare HTML is rejected.
 The macro does not validate HTML structure or infer attribute contexts.
@@ -91,8 +93,8 @@ disposes render instances. Reusability here follows Rust's existing `Slice::rend
 
 This is the bounded first milestone in
 [#30](https://github.com/davidfowl/razor-rust/issues/30), not the whole port.
-Template declarations/strongly typed model factories, dedicated control-flow DSL,
-and async expressions/codegen remain in [#3](https://github.com/davidfowl/razor-rust/issues/3).
+Template declarations and async expressions/codegen remain in
+[#3](https://github.com/davidfowl/razor-rust/issues/3).
 Ordinary Rust expressions can contain blocks or conditionals but there are no
 Razor directives. Layouts/sections remain [#4](https://github.com/davidfowl/razor-rust/issues/4),
 async/context-aware partials [#5](https://github.com/davidfowl/razor-rust/issues/5), web integration
