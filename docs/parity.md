@@ -27,6 +27,7 @@ An implemented row is not blanket verification of its whole feature.
 | Generated typed models, nested control flow, primitive/trusted/attribute values | Implemented | Runtime `inline`, `control_flow`, `async_templates`, `attributes` tests and runnable value examples; broader grammar/date/custom formatting and encoder configuration remain #3/#2. |
 | Generated async writer type does not shadow identifiers visible in the invocation | Implemented, Rust-specific | `compiler_hygiene` renders associated constants twice with exact escaped output; macro unit coverage includes nested/raw identifiers and generic names. Identifiers introduced by later nested macro expansion are outside this scan. No C# differential claim. |
 | Raw model field spelling and conditional-compilation validation | Implemented, Rust-specific | `compiler_raw_identifiers` checks owned/borrowed constructors and render-body compilation; macro unit tests accept `r#model`, reject wrong/multiple fields and retain the invocation-level `cfg`/`cfg_attr` guard for ordinary/raw spellings on structs/fields. This is compiler compatibility, not runtime/lifecycle equivalence. |
+| Render-local code blocks preserve bindings and semicolon-less unit expression tails | Implemented, Rust-specific | `compiler_code_blocks` renders exact escaped output twice, with zero construction effects and five effects per render, including nested/attributed/awaited tails. Four standalone doctests include positive binding scope and rejection of integer, `Result` and unawaited future tails. No C# differential or lifecycle equivalence claim. |
 | Optional body values: absent output, encoded string, nullable integer/float and trusted HTML | Verified, bounded | Twelve `optional-values` cases use both pinned C# PipeWriter/TextWriter paths and match `fixtures/optional-values.txt` in synchronous text/byte and generated async Rust paths. Rust `Option<T>` delegates `Some` and emits nothing for `None`. This does not establish broad encoder/culture/boolean formatting equivalence. |
 | Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
 | Character body/nullable/attribute output in the selected common ASCII subset | Verified, bounded | Fourteen `character-values` cases match actual pinned C# PipeWriter/TextWriter output and generated sync text/byte/async Rust paths via `fixtures/character-values.txt`. Character support is additive; broader Unicode/quote-policy equivalence is not claimed. |
@@ -45,11 +46,12 @@ An implemented row is not blanket verification of its whole feature.
 
 ## Rust compiler compatibility
 
-Two compiler-only fixes are integrated alongside the character work, without
+Compiler-only fixes are integrated alongside the character work, without
 changing the pinned C# reference or Rust runtime defaults. Their source patches
 are `c8107ded48af02f879a726a5c88b52b6cab6fa23` (writer-name hygiene) and
-`56b7d0609f9c3c7a7a0f1e2d5f60bf1dd0177b93` (raw-identifier validation).
-Both were reviewed against their common base
+`56b7d0609f9c3c7a7a0f1e2d5f60bf1dd0177b93` (raw-identifier validation), plus
+`7370e5ed641f22d207e3beab757eb6e8bfa7eca7` (unit code-block tails).
+They were reviewed against their common base
 `841bf9c585209cc3415d5fdd0e1224f133ccb852` and integrated over the character
 implementation. These are Rust-specific bugs, not cross-language comparisons.
 
@@ -64,7 +66,7 @@ bypass that guard.
 
 ```sh
 cargo test --locked -p razor-slices-macros
-cargo test --locked -p razor-slices --test compiler_hygiene --test compiler_raw_identifiers
+cargo test --locked -p razor-slices --test compiler_hygiene --test compiler_raw_identifiers --test compiler_code_blocks
 ```
 
 The hygiene regression renders the same template twice and requires exact
@@ -74,6 +76,17 @@ render. Three additional macro unit tests cover name selection, valid/invalid
 model declarations, and ordinary/raw struct/field conditional attributes.
 The name scan cannot observe identifiers introduced only by a later nested
 macro expansion. Broader grammar and parent-epic scope remain open.
+
+The code-block regression also fails against the earlier combined compiler head
+`7d0149ce`: a valid `@{ let label = "<local>"; model.touch() }` produces an
+unexpected generated `__razor_writer` token when its tail is flattened directly
+before the next template write. Wrapping only semicolon-less expressions as
+unit-valued block statements preserves preceding render-local bindings without
+silently discarding values. The regression renders `&lt;local&gt;done` twice,
+asserting zero effects at construction and effect counts of five and ten after
+the two renders. Its four doctests preserve rejection of integer, `Result`
+and unawaited future tails. This is Rust code-generation correctness, not new
+cross-language or cancellation/lifecycle parity.
 
 ## Reproduce the C# golden
 

@@ -62,6 +62,14 @@ For values, use `@{ let value = fetch(model).await?; }` followed by `{value}`,
 or `{fetch(model).await?}`. Normal Rust diagnostics still apply to code-block
 statements; the macro does not suppress must-use warnings.
 
+Code blocks keep preceding bindings available to later template parts.
+A semicolon-less tail such as `@{ let label = "<local>"; model.touch() }`
+is accepted when the final expression returns `()`, including an awaited
+unit-returning call. `{label}` can then emit the encoded local value.
+Non-unit integer, `Result` and unawaited future tails remain compile errors;
+the macro does not insert a semicolon that would silently discard them.
+Code executes during each render, not template construction.
+
 Interpolation uses the explicit `AsyncWriteHtmlValue` contract. Built-ins are
 `str`, `String`, `char`, references, `bool`, all Rust signed/unsigned integer families,
 `f32`/`f64`, trusted `HtmlString`, and validated `attribute(name, value)` adapters.
