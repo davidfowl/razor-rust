@@ -5,7 +5,9 @@ Bounded [#64](https://github.com/davidfowl/razor-rust/issues/64) /
 [#47](https://github.com/davidfowl/razor-rust/issues/47), #4/#11. This source
 is based on frozen, Ready/unmerged integration #61 at
 `7b6a8aeac067a06f64eae656a79ccdea5b035619`; it is not main or a released port.
-Independent async value work #62/#63 is not included.
+This consolidated source also includes async value work #62/#63, request
+scope #68 and automatic completed-slice flush #73; see the
+[source manifest](integration.md#exact-source-deliveries).
 
 ## Typed association and content context
 

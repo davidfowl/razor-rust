@@ -69,6 +69,11 @@ Both sets of samples, fixtures and HTTP regressions remain in CI. ADR
 reconciliation preserves the accepted option A and historical option B
 recommendation without reverting the implemented preview to scaffolding.
 
+Consolidation regressions additionally cover repeated scoped nested documents,
+typed cancellation in their held child section, unchanged shared threshold
+accounting and cancellation during an automatic completion flush. They retain
+exact output prefixes and stop suffix/final-flush work on cancellation.
+
 ## Runnable cross-feature acceptance
 
 ```sh

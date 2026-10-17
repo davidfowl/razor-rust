@@ -1,7 +1,10 @@
 #[path = "../examples/support/combined_async.rs"]
 mod sample;
 
-use razor_slices::{render_incremental, AsyncRenderError, AsyncSlice, AsyncSliceWriter};
+use razor_slices::{
+    render_incremental, render_incremental_with_context, AsyncRenderError, AsyncSlice,
+    AsyncSliceWriter, CancellationToken, RenderCancelled, RenderContext,
+};
 use std::{
     fmt,
     future::{poll_fn, Future},
@@ -110,6 +113,53 @@ async fn borrowed_owned_repeated_documents_and_wrapped_partials_keep_immediate_c
     assert_eq!(model.entered.load(Ordering::SeqCst), 4);
     assert_eq!(model.completed.load(Ordering::SeqCst), 4);
     assert_eq!(model.dropped.load(Ordering::SeqCst), 4);
+}
+
+#[test]
+fn scoped_nested_generated_layouts_repeat_then_cancel_the_held_child_section() {
+    let model = sample::Model::demo();
+    let token = CancellationToken::new();
+    let context = RenderContext::new(&model, token.clone());
+    let page = sample::page(*context.request());
+    let state = Arc::new(Mutex::new(State::default()));
+    let mut writer = Writer(state.clone());
+    let waker = waker();
+    let mut cx = Context::from_waker(&waker);
+    for round in 0..2 {
+        model.release.notify_one();
+        let wrapped = Box::new(&page);
+        let mut future = pin!(render_incremental_with_context(
+            &wrapped,
+            &mut writer,
+            &context
+        ));
+        assert_send(future.as_mut());
+        assert!(matches!(future.as_mut().poll(&mut cx), Poll::Ready(Ok(()))));
+        assert_eq!(
+            state.lock().unwrap().bytes,
+            sample::PAGE.repeat(round + 1).as_bytes()
+        );
+    }
+    let mut future = pin!(render_incremental_with_context(
+        &page,
+        &mut writer,
+        &context
+    ));
+    assert!(future.as_mut().poll(&mut cx).is_pending());
+    assert_eq!(model.entered.load(Ordering::SeqCst), 3);
+    let expected = format!("{}{}", sample::PAGE.repeat(2), sample::PREFIX);
+    assert_eq!(state.lock().unwrap().bytes, expected.as_bytes());
+    token.cancel();
+    let Poll::Ready(Err(AsyncRenderError::Write(error))) = future.as_mut().poll(&mut cx) else {
+        panic!("cancellation must interrupt the nested layout's held section");
+    };
+    assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+    assert!(error.get_ref().unwrap().is::<RenderCancelled>());
+    model.release.notify_one();
+    assert_eq!(model.completed.load(Ordering::SeqCst), 2);
+    assert_eq!(model.dropped.load(Ordering::SeqCst), 3);
+    assert_eq!(state.lock().unwrap().bytes, expected.as_bytes());
+    assert_eq!(state.lock().unwrap().flushes, 5);
 }
 
 #[cfg(feature = "tokio")]

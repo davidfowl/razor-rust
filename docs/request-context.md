@@ -131,17 +131,19 @@ whole render against cancellation; upstream arbitrary application awaits
 require application cooperation and are not automatically interrupted by
 `RequestAborted`. This stronger opt-in Rust scope is explicit, not claimed
 identical .NET application-await semantics. Upstream synchronous buffer writes
-and pipe flags/threshold auto-flush are not replicated.
+and native pipe flags are not replicated. Successful completed slices/layouts
+do check the inclusive 16,384-byte threshold in this consolidated source.
 
 ## Known gaps / follow-ups
 
-- [#69](https://github.com/davidfowl/razor-rust/issues/69) tracks request-scope
-  assembly with #47/#65's separately owned async declared layouts/immediate section
-  context. This branch remains based on #63, excludes #65, and does not claim
-  its assembled request-scope regression coverage. Those implementations share
-  the output seam; combined integration must be verified after assembly.
+- [#69](https://github.com/davidfowl/razor-rust/issues/69) tracks broader
+  request-scope/declared-layout acceptance. This consolidation includes both
+  #68 and #65 through #73. Added regressions exercise repeated generated nested
+  layouts, cancellation inside a held child section, shared threshold accounting
+  and cancellation during an automatic flush. That bounded coverage does not
+  claim the entire #69 acceptance scope.
 - #52 retains automatic HTTP request metadata/service association and portable
   response start; generic request data is explicit in this milestone.
-- #11 retains writer completion flags, auto-flush, disposal/initialization
+- #11 retains native writer completion/accounting flags, disposal/initialization
   lifecycle and broader encoder policy. The synchronous buffered bridge is
   unchanged and has no new cancellation API.
