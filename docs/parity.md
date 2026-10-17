@@ -128,6 +128,12 @@ also checks that failed execution itself does not auto-flush.
 Rust-specific regressions additionally cover original errors, pending/failed/
 dropped native flushes, cancellation after partial acceptance, generated children,
 layouts, section-owned children, explicit/final flushes and reborrowed output.
+A real Tokio `BufWriter` regression reports its actual buffered length, preloads
+16,383 bytes and inserts a one-byte child over a one-byte duplex. The reader
+must receive the entire threshold-sized prefix before releasing later template
+work; without the native completion flush this handshake cannot complete.
+Its buffer capacity exceeds the prefix, preventing an incidental capacity flush
+from satisfying the test. This is bounded buffered-I/O evidence, not TCP delivery.
 
 These cases do not equate .NET `PipeWriter.Advance` with every possible Rust
 `write_all` implementation. A native provider must supply a truthful snapshot.

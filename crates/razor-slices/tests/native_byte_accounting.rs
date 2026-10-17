@@ -416,3 +416,72 @@ async fn generated_children_layouts_and_section_owned_children_share_native_capa
         .unwrap();
     assert_eq!(state.lock().unwrap().flushes, [THRESHOLD]);
 }
+
+#[tokio::test]
+async fn native_bufwriter_flushes_prebuffered_prefix_before_later_application_work() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt, BufWriter, DuplexStream},
+        sync::Notify,
+    };
+
+    struct NativeBuffer(BufWriter<DuplexStream>);
+
+    impl AsyncSliceWriter for NativeBuffer {
+        fn unflushed_bytes(&self) -> Option<usize> {
+            Some(self.0.buffer().len())
+        }
+
+        async fn write_all(&mut self, bytes: &[u8]) -> io::Result<()> {
+            self.0.write_all(bytes).await
+        }
+
+        async fn flush(&mut self) -> io::Result<()> {
+            self.0.flush().await
+        }
+    }
+
+    struct Model {
+        release: Notify,
+        later_completed: AtomicBool,
+    }
+
+    async_template! {
+        struct BufferedPage<'a> { model: &'a Model } => {
+            @render { Literal("x") };
+            @await { model.release.notified() };
+            @{ model.later_completed.store(true, Ordering::SeqCst); }
+            "tail"
+        }
+    }
+
+    let model = Model {
+        release: Notify::new(),
+        later_completed: AtomicBool::new(false),
+    };
+    let (stream, mut reader) = tokio::io::duplex(1);
+    let mut writer = NativeBuffer(BufWriter::with_capacity(THRESHOLD * 2, stream));
+    writer
+        .0
+        .write_all(&vec![b'p'; THRESHOLD - 1])
+        .await
+        .unwrap();
+    assert_eq!(writer.0.buffer().len(), THRESHOLD - 1);
+
+    let page = BufferedPage::new(&model);
+    let render = render_incremental(&page, &mut writer);
+    let receive = async {
+        let mut prefix = vec![0; THRESHOLD];
+        reader.read_exact(&mut prefix).await.unwrap();
+        assert_eq!(&prefix[..THRESHOLD - 1], &vec![b'p'; THRESHOLD - 1]);
+        assert_eq!(prefix[THRESHOLD - 1], b'x');
+        assert!(!model.later_completed.load(Ordering::SeqCst));
+        model.release.notify_one();
+        let mut tail = [0; 4];
+        reader.read_exact(&mut tail).await.unwrap();
+        assert_eq!(&tail, b"tail");
+    };
+    let (result, ()) = tokio::join!(render, receive);
+    result.unwrap();
+    assert!(model.later_completed.load(Ordering::SeqCst));
+}
