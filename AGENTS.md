@@ -49,7 +49,9 @@ do not duplicate work already in progress.
   Generated children, `AsyncHtmlWriter::write_slice`, supplied layout bodies and
   completed layouts check the inclusive 16,384 accepted-output-byte threshold.
   Writes/arbitrary awaits/plain sections do not auto-flush. Root final flush
-  and explicit flush remain unchanged; request scope #68/#69 is not assembled.
+  and explicit flush remain unchanged. Request scope #68 shares this writer's
+  cancellation token with layouts and completion flushes; broader #69
+  acceptance remains separate from this consolidation.
 - `AsyncSliceWriter` is runtime-agnostic. The default-off `tokio` feature adds
   `TokioWriter`; the core has no mandatory async-runtime dependency. Tokio is
   also a dev-dependency for tests, which does not make the adapter available

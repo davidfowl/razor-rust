@@ -1,5 +1,12 @@
 # Combined-source preview
 
+This consolidation includes all 23 open PRs targeting main at the source
+snapshot below. It starts from fresh main, merges #73 (including its existing
+stack), then #68, then independent documentation #29. Git ancestry preserves
+the original commits and authors without replaying stacked PRs. The prior
+empty direct-access test commit is not included. Source branches and PRs
+remain unchanged and open.
+
 Focused [#60](https://github.com/davidfowl/razor-rust/issues/60),
 [PR #61](https://github.com/davidfowl/razor-rust/pull/61) assembles delivered
 feature branches without changing main or any source PR branch. They remain
@@ -26,6 +33,7 @@ through #73's existing ancestry; broader request/layout acceptance remains #69.
 | --- | --- | --- |
 | #25 | `06c1d980aa3c6c2d5d4d916006bb6a94fb6284ca` | Wrapper override preservation |
 | #27 | `1dc37e5bee948b09700d85556c88d3c085505025` | Contributor instructions |
+| #29 | `c7996d99abc3f7afc57f50c46baf11da6dbd6dad` | Accepted inline-codegen ADR |
 | #31 | `e44e961c4b39552d679726a5391f278b8b1be472` | Inline templates |
 | #33 | `abeaad6d3a8648e8f7bfe2d166d2d3716da6a1fc` | Typed model-driven partials |
 | #35 | `13e7d31a5e3605d1c936d5e65895d79b302169f7` | Explicit layout/body composition |
@@ -43,6 +51,9 @@ through #73's existing ancestry; broader request/layout acceptance remains #69.
 | #61 | `7b6a8aeac067a06f64eae656a79ccdea5b035619` | Frozen 16-delivery integration base |
 | #63 | `43056c1cc10f96c92cdfd0c04aeec42b745024c3` | Generated primitive/trusted/conditional values |
 | #65 | `d12959b2fe574a4f80dcd599d63ea91e3d1c0fcc` | Declared/nested async layouts, immediate-content sections |
+| #68 | `cb08fadae182a36a5cabda0f8ea1a4bbf04582fa` | Typed request scope and cooperative cancellation |
+| #71 | `0e4c49a8e7cab4061d56964709fbd55bc6fb2788` | Combined generated values and nested-layout acceptance |
+| #73 | `351409ab6453c3808152cee7d04d612894b5ee5c` | Automatic completed-slice threshold flush |
 
 The HTTP stack includes clean copies of #38's original commits. Combining
 #49 retains the original async history as well; duplicate implementation
@@ -50,6 +61,13 @@ lines are resolved to the section-aware version, not duplicated definitions.
 Export conflicts preserve synchronous layout/section/attribute APIs alongside
 incremental async APIs. Wrapper integration retains all text/byte overrides
 and the newer child/section dispatch paths.
+
+The consolidation retains both cancellation and unflushed-byte state on the
+shared writer. Only successful cancellable writes count toward the threshold;
+requested flushes reset accounting before awaiting the cancellable destination.
+Both sets of samples, fixtures and HTTP regressions remain in CI. ADR
+reconciliation preserves the accepted option A and historical option B
+recommendation without reverting the implemented preview to scaffolding.
 
 ## Runnable cross-feature acceptance
 
@@ -148,9 +166,9 @@ unchanged and executable.
 
 Bounded [#72 / PR #73](https://github.com/davidfowl/razor-rust/pull/73)
 adds automatic 16,384-byte **completed-slice** flush to frozen #71 at
-`0e4c49a8e7cab4061d56964709fbd55bc6fb2788`. It does not combine request scope
-#68; separately owned #69 remains the request-context/layout integration
-dependency. The existing preview and its exact fixtures remain intact.
+`0e4c49a8e7cab4061d56964709fbd55bc6fb2788`. This consolidation additionally
+combines request scope #68; broader #69 acceptance is not claimed complete.
+The existing preview and its exact fixtures remain intact.
 See [automatic completion acceptance](async-rendering.md#automatic-completion-flush)
 for executable buffered-sink and real HTTP evidence and native-pipe limits.
 
@@ -160,7 +178,7 @@ adds bounded primitive, trusted-HTML and conditional attribute interpolation
 in this follow-up source. The generated mixed-value executable and real HTTP/1
 test observe an exact prefix before releasing later application work.
 Custom synchronous values still require explicit async implementations.
-Reserved ADR reconciliation #28/#29 is not overwritten. Current source
+ADR reconciliation #28/#29 is included with its historical evidence. Current source
 instructions and README describe the assembled code, not historical
 scaffolding.
 

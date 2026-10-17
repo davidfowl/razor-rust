@@ -9,7 +9,9 @@ rendering — without pulling in a full web/MVC framework.
 > assembles the delivered template, layout, section and HTTP features in
 > [PR #61](https://github.com/davidfowl/razor-rust/pull/61), with verified async
 > value/layout deliveries #63/#65 combined in [PR #71](https://github.com/davidfowl/razor-rust/pull/71). Its source PRs
-> remain unmerged; this is not a claim that the preview is on main or released.
+> are consolidated here with request scope #68, automatic flush #73 and the
+> accepted inline-codegen decision #29. Source PRs remain unmerged; this is not
+> a claim that the preview is on main or released.
 > See [#1](https://github.com/davidfowl/razor-rust/issues/1) for the live roadmap.
 
 ## What works today
@@ -125,6 +127,10 @@ is open. Servers run locally; no hosted preview or deployment is provided.
 
 ## What's next
 
+- [Inline proc-macro authoring was accepted](https://github.com/davidfowl/razor-rust/issues/3#issuecomment-6132090066)
+  as option A. [ADR 0001](docs/adr/0001-template-syntax-and-codegen-mechanism.md)
+  preserves the historical external-file recommendation and distinguishes
+  that mechanism decision from the APIs implemented in this preview.
 - [#3](https://github.com/davidfowl/razor-rust/issues/3): broader generated
   template grammar and value-type parity. Typed async declarations, nested
   control flow, await/flush, child and section directives from
