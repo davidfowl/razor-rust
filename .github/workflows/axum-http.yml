@@ -1,0 +1,30 @@
+name: Axum HTTP smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  server-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: [stable, "1.75.0"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: axum-${{ matrix.toolchain }}
+      - name: Build buffered and streaming HTTP servers
+        run: cargo build --locked -p razor-slices-axum --examples
+      - name: Exercise real GET and rendering failure
+        run: bash crates/razor-slices-axum/tests/server-smoke.sh
+      - name: Verify real streaming prefix-before-release handshake
+        run: cargo test --locked -p razor-slices-axum --test http real_http_prefix_is_received_before_separate_release_request_and_exact_suffix -- --exact
+      - name: Verify combined generated values layouts partials and disconnect
+        run: cargo test --locked -p razor-slices-axum --test http combined

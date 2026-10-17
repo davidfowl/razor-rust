@@ -1,0 +1,6 @@
+Render 1 prefix: <article><h1>&lt;request&gt; &amp; 雪</h1>
+Render 1 full: <article><h1>&lt;request&gt; &amp; 雪</h1><p>&lt;request&gt; &amp; 雪</p></article>
+Render 2 prefix: <article><h1>&lt;request&gt; &amp; 雪</h1>
+Render 2 full: <article><h1>&lt;request&gt; &amp; 雪</h1><p>&lt;request&gt; &amp; 雪</p></article>
+Render 3 prefix: <article><h1>&lt;request&gt; &amp; 雪</h1>
+Cancelled: Interrupted

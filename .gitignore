@@ -1,3 +1,4 @@
 /target
+crates/razor-slices/tests/renamed/target/
 Cargo.lock
 .DS_Store

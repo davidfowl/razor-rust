@@ -17,10 +17,43 @@ rust-version.workspace = true
 tokio = ["dep:tokio"]
 
 [dependencies]
+razor-slices-macros = { version = "0.1.0", path = "../razor-slices-macros" }
 tokio = { version = "1", features = ["io-util"], optional = true }
 # SIMD-accelerated byte scanning for the HTML encoder's run detection; see
 # docs/adr/0005-simd-html-encoding.md.
 memchr = "2"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt", "io-util"] }
+tokio = { version = "1", features = ["macros", "rt", "io-util", "sync"] }
+
+[[example]]
+name = "incremental"
+required-features = ["tokio"]
+
+[[example]]
+name = "async_sections"
+required-features = ["tokio"]
+
+[[example]]
+name = "async_template"
+required-features = ["tokio"]
+
+[[example]]
+name = "async_values"
+required-features = ["tokio"]
+
+[[example]]
+name = "async_layout"
+required-features = ["tokio"]
+
+[[example]]
+name = "combined_async"
+required-features = ["tokio"]
+
+[[example]]
+name = "automatic_flush"
+required-features = ["tokio"]
+
+[[example]]
+name = "request_context"
+required-features = ["tokio"]

@@ -5,6 +5,8 @@
 use std::fmt;
 use std::io;
 
+use crate::{AsyncHtmlWriter, AsyncSliceWriter, AsyncWriteHtmlValue};
+
 /// A string that is already known to be safe HTML and should **not** be
 /// re-encoded when written to a template's output.
 ///
@@ -156,6 +158,10 @@ impl<const N: usize> FixedBuf<N> {
     fn as_bytes(&self) -> &[u8] {
         &self.buf[..self.len]
     }
+
+    fn as_str(&self) -> &str {
+        std::str::from_utf8(self.as_bytes()).expect("fmt::Write accepts only UTF-8")
+    }
 }
 
 impl<const N: usize> fmt::Write for FixedBuf<N> {
@@ -182,6 +188,12 @@ impl<const N: usize> fmt::Write for FixedBuf<N> {
 pub trait WriteHtmlValue {
     /// Writes this value's HTML representation to `writer`.
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()>;
+}
+
+impl<T: WriteHtmlValue + ?Sized> WriteHtmlValue for &T {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        (**self).write_html_to(writer)
+    }
 }
 
 impl WriteHtmlValue for str {
@@ -224,6 +236,17 @@ macro_rules! impl_write_html_value_for_int {
                     writer.write_all(buf.as_bytes())
                 }
             }
+            impl AsyncWriteHtmlValue for $t {
+                async fn write_html_async<W: AsyncSliceWriter + Send>(
+                    &self,
+                    output: &mut AsyncHtmlWriter<'_, W>,
+                ) -> io::Result<()> {
+                    use fmt::Write as _;
+                    let mut buf = FixedBuf::<40>::new();
+                    write!(buf, "{self}").expect("integer formatting always fits in 40 bytes");
+                    output.write_literal(buf.as_str()).await
+                }
+            }
         )*
     };
 }
@@ -248,6 +271,19 @@ macro_rules! impl_write_html_value_for_float {
                     } else {
                         writer.write_all(self.to_string().as_bytes())
                     }
+                }
+            }
+            impl AsyncWriteHtmlValue for $t {
+                async fn write_html_async<W: AsyncSliceWriter + Send>(
+                    &self,
+                    output: &mut AsyncHtmlWriter<'_, W>,
+                ) -> io::Result<()> {
+                    use fmt::Write as _;
+                    let mut buf = FixedBuf::<400>::new();
+                    write!(buf, "{self}").map_err(|error| {
+                        io::Error::new(io::ErrorKind::InvalidData, error)
+                    })?;
+                    output.write_literal(buf.as_str()).await
                 }
             }
         )*
