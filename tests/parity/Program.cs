@@ -12,6 +12,12 @@ if (args is ["flush-outcomes"])
     return;
 }
 
+if (args is ["flush-policy"])
+{
+    await NativeSinkCases.RunFlushPolicy();
+    return;
+}
+
 using var document = new StringWriter();
 await new Page().RenderAsync(document);
 Console.WriteLine($"document: {document}");

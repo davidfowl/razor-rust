@@ -66,6 +66,18 @@ pub trait AsyncSliceWriter {
     /// can use the explicit `@flush;` directive.
     fn flush(&mut self) -> impl std::future::Future<Output = io::Result<()>> + Send;
 
+    /// Enables threshold-based flushes after successful child/layout completion.
+    ///
+    /// The default `true` preserves pipe-like completion flushing. TextWriter-like
+    /// sinks can return `false`; disabled boundaries do not query
+    /// [`Self::unflushed_bytes`]. Explicit [`AsyncHtmlWriter::flush`], the final
+    /// flush of [`render_incremental`], and the buffered [`render_async`] bridge
+    /// still flush and propagate errors/cancellation as before. This is not a
+    /// switch for destination writes, shutdown, or slice disposal.
+    fn auto_flush_enabled(&self) -> bool {
+        true
+    }
+
     /// Returns the sink's native count of accepted, unflushed output bytes.
     ///
     /// `Some(count)` is authoritative at successful slice/layout completion,

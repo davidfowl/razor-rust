@@ -79,6 +79,70 @@ static class NativeSinkCases
         Console.WriteLine($"textwriter-explicit: flushes={text.Flushes}");
     }
 
+    public static async Task RunFlushPolicy()
+    {
+        foreach (var size in new[] { Threshold - 1, Threshold, Threshold + 1 })
+            await PolicyCase(size.ToString(), () => new Text(new string('x', size)), size);
+        await PolicyCase("children", () => new PolicyChildren(), Threshold);
+        await PolicyCase("explicit", () => new PolicyExplicit(), Threshold);
+        await PolicyCase("layout", () => new PolicyPage(), Threshold);
+    }
+
+    private static async Task PolicyCase(string name, Func<RazorSlice> create, int size)
+    {
+        var pipe = new CountingPipeWriter(true, 0, false);
+        await create().RenderAsync(pipe);
+        if (pipe.Accepted.Count != size || pipe.Accepted.Any(value => value != (byte)'x'))
+            throw new InvalidOperationException("Pipe output must match the exact ASCII literal.");
+        Console.WriteLine($"pipe-{name}: flushes={pipe.Flushes.Count}");
+        using var text = new CountingTextWriter();
+        await create().RenderAsync(text);
+        if (text.ToString() != new string('x', size))
+            throw new InvalidOperationException("Text output must match the exact ASCII literal.");
+        Console.WriteLine($"text-{name}: flushes={text.Flushes}");
+    }
+
+    private sealed class PolicyChildren : RazorSlice
+    {
+        public override async Task ExecuteAsync()
+        {
+            await RenderPartialAsync(new Text(new string('x', Threshold / 2)));
+            await RenderPartialAsync(new Text(new string('x', Threshold / 2)));
+        }
+    }
+
+    private sealed class PolicyExplicit : RazorSlice
+    {
+        public override async Task ExecuteAsync()
+        {
+            WriteLiteral(new string('x', Threshold));
+            await FlushAsync();
+        }
+    }
+
+    private sealed class PolicyPage : RazorSlice, IUsesLayout<PolicyLayoutProxy>
+    {
+        public override Task ExecuteAsync()
+        {
+            WriteLiteral(new string('x', Threshold / 2));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class PolicyLayout : RazorLayoutSlice
+    {
+        public override async Task ExecuteAsync()
+        {
+            await RenderBodyAsync();
+            WriteLiteral(new string('x', Threshold / 2));
+        }
+    }
+
+    private sealed class PolicyLayoutProxy : IRazorSliceProxy
+    {
+        public static RazorSlice CreateSlice() => new PolicyLayout();
+    }
+
     private static async Task Case(
         string name, bool native, int prefilled, string text,
         bool drain = false, bool partialFailure = false)
@@ -156,6 +220,7 @@ static class NativeSinkCases
         public Exception? Failure { get; set; }
         public bool CancelFlush { get; set; }
         public List<int> Flushes { get; } = [];
+        public List<byte> Accepted { get; } = [];
         public override bool CanGetUnflushedBytes => _native;
         public override long UnflushedBytes => _native ? Pending : throw new NotSupportedException();
 
@@ -166,10 +231,12 @@ static class NativeSinkCases
                 FailNextAdvance = false;
                 var accepted = Math.Min(1, bytes);
                 _buffer.Advance(accepted);
+                Accepted.AddRange(_buffer.WrittenSpan[^accepted..].ToArray());
                 Pending += accepted;
                 throw new IOException("original partial failure");
             }
             _buffer.Advance(bytes);
+            Accepted.AddRange(_buffer.WrittenSpan[^bytes..].ToArray());
             Pending = _drain ? 0 : Pending + bytes;
         }
 

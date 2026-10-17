@@ -46,6 +46,8 @@ rendering — without pulling in a full web/MVC framework.
   are tracked in bounded [#72 / PR #73](https://github.com/davidfowl/razor-rust/pull/73).
   Sinks may opt into native `unflushed_bytes()` snapshots, including prebuffered
   or partially accepted output, without changing the default fallback.
+  TextWriter-like sinks may disable completion flushes with
+  `auto_flush_enabled() -> false`; explicit and root-final flushes still run.
   [Exact C# accounting cases and remaining #74 scope](docs/parity.md#native-byte-accounting-74)
   distinguish byte-count fidelity from native flush-result flags.
 - Axum adapters for atomic buffered HTML responses and bounded incremental

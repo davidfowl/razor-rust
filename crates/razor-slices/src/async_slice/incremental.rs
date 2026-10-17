@@ -239,6 +239,8 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
     /// across children, encoded values and layouts on this output. A sink's
     /// native [`AsyncSliceWriter::unflushed_bytes`] count takes precedence over
     /// the fallback count of successful writes through this output borrow.
+    /// A sink may disable these checks with [`AsyncSliceWriter::auto_flush_enabled`]
+    /// without disabling explicit or root-final flushing.
     pub async fn write_slice(
         &mut self,
         slice: &(impl AsyncSlice + ?Sized),
@@ -251,10 +253,12 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
     }
 
     pub(super) fn should_auto_flush(&self) -> bool {
-        self.writer
-            .unflushed_bytes()
-            .unwrap_or(self.unflushed_bytes)
-            >= 16 * 1_024
+        self.writer.auto_flush_enabled()
+            && self
+                .writer
+                .unflushed_bytes()
+                .unwrap_or(self.unflushed_bytes)
+                >= 16 * 1_024
     }
 
     /// Executes a named section without adding a dispatch-level auto-flush.
@@ -304,6 +308,8 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
 /// not provided. Native [`AsyncSliceWriter::unflushed_bytes`] snapshots include
 /// preexisting sink buffers; the default fallback starts at zero for each new
 /// output borrow and counts only successful writes through it.
+/// [`AsyncSliceWriter::auto_flush_enabled`] can disable automatic completion
+/// flushes, but not this entry point's final flush.
 pub async fn render_incremental(
     slice: &(impl AsyncSlice + ?Sized),
     writer: &mut (impl AsyncSliceWriter + Send),

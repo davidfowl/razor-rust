@@ -48,12 +48,13 @@ do not duplicate work already in progress.
   execution bypasses declared layouts, but retains explicit composition.
   Generated children, `AsyncHtmlWriter::write_slice`, supplied layout bodies and
   completed layouts check the inclusive 16,384 accepted-output-byte threshold.
-  Writes/arbitrary awaits/plain sections do not auto-flush. Root final flush
-  and explicit flush remain unchanged. Optional
+  Writes/arbitrary awaits/plain sections do not auto-flush. TextWriter-like
+  sinks can opt out with `AsyncSliceWriter::auto_flush_enabled() -> false`;
+  the default remains enabled. Root final flush and explicit flush remain unchanged. Optional
   `AsyncSliceWriter::unflushed_bytes()` supplies an authoritative native snapshot;
   the default `None` retains successful-write fallback accounting, reset when
   flush is requested. See docs/parity.md for bounded #74 differential evidence
-  and remaining native flag/policy gaps. Request scope #68 shares this writer's
+  and remaining native flag/root-lifecycle gaps. Request scope #68 shares this writer's
   cancellation token with layouts and completion flushes; broader #69
   acceptance remains separate from this consolidation.
 - `AsyncSliceWriter` is runtime-agnostic. The default-off `tokio` feature adds
