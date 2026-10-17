@@ -29,7 +29,8 @@ let greeting = Greeting::new("<World>");
 ```
 
 The declaration is a Rust named-field struct with exactly one field named
-`model`. The generated `new(model)` constructor has the struct's visibility.
+`model` (the equivalent raw spelling `r#model` is also accepted).
+The generated `new(model)` constructor has the struct's visibility.
 The field's type is the constructor's type: it can own a model or borrow one
 with an explicit lifetime. Each render binds `model` to `&self.model`; it does
 not consume it. Ordinary lifetime/type parameters, where clauses, derives and
@@ -37,7 +38,8 @@ documentation attributes are supported. Supply `Sync` bounds for generic
 models, e.g. `struct Text<T: AsRef<str> + Sync> { model: T }`. Conditional
 compilation must wrap the whole macro invocation; `cfg`/`cfg_attr` on the
 inner struct/model field are rejected rather than leaving orphan generated
-implementations or conditionally removing the required model field.
+implementations or conditionally removing the required model field. This
+includes their raw spellings `r#cfg` and `r#cfg_attr`.
 
 Every body (including nested branches/loops) accepts:
 
@@ -116,6 +118,12 @@ missing directive delimiters and invalid declarations fail at compile time,
 never becoming silent text. The synchronous `html!` grammar/behavior is unchanged.
 The macro supplies its runtime path hygienically, including renamed dependencies
 and callers without the implicit prelude.
+Its generated writer type parameter avoids identifiers visible anywhere in
+the invocation, including raw identifiers and paths in nested bodies. This
+prevents a user type such as `__RazorWriter` from being shadowed by the generated
+parameter. Identifiers introduced only by a later nested macro expansion are
+not visible to this scan. These are Rust compiler compatibility guarantees,
+not additional C# runtime parity; see the [compiler evidence](parity.md#rust-compiler-compatibility).
 
 ## Runnable prefix-before-await fixture
 

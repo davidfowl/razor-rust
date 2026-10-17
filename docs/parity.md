@@ -25,6 +25,8 @@ An implemented row is not blanket verification of its whole feature.
 | Optional, case-sensitive, repeated and whitespace section names; empty name rejected; partial bypasses all declared layouts | Verified, bounded | Same golden includes missing `page-only` (must not recurse), `Footer`, whitespace, repeated footer, bare partial and empty-name rejection. This covers ASCII literal output, not general encoder equivalence. |
 | Layout references/boxes, `Sectioned` associations/shadowing, explicit composition, original writer errors, lazy execution without flush | Implemented | `tests/nested_layout_sections.rs` plus existing `declared_layouts`, `layouts`, `sections` suites. Every byte-offset failure of the golden document is tested, retaining I/O kind/source and exact accepted prefix. These Rust-specific adapter/error contracts are not C# differential tests. |
 | Generated typed models, nested control flow, primitive/trusted/attribute values | Implemented | Runtime `inline`, `control_flow`, `async_templates`, `attributes` tests and runnable value examples; broader grammar/date/custom formatting and encoder configuration remain #3/#2. |
+| Generated async writer type does not shadow identifiers visible in the invocation | Implemented, Rust-specific | `compiler_hygiene` renders associated constants twice with exact escaped output; macro unit coverage includes nested/raw identifiers and generic names. Identifiers introduced by later nested macro expansion are outside this scan. No C# differential claim. |
+| Raw model field spelling and conditional-compilation validation | Implemented, Rust-specific | `compiler_raw_identifiers` checks owned/borrowed constructors and render-body compilation; macro unit tests accept `r#model`, reject wrong/multiple fields and retain the invocation-level `cfg`/`cfg_attr` guard for ordinary/raw spellings on structs/fields. This is compiler compatibility, not runtime/lifecycle equivalence. |
 | Optional body values: absent output, encoded string, nullable integer/float and trusted HTML | Verified, bounded | Twelve `optional-values` cases use both pinned C# PipeWriter/TextWriter paths and match `fixtures/optional-values.txt` in synchronous text/byte and generated async Rust paths. Rust `Option<T>` delegates `Some` and emits nothing for `None`. This does not establish broad encoder/culture/boolean formatting equivalence. |
 | Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
 | Character body/nullable/attribute output in the selected common ASCII subset | Verified, bounded | Fourteen `character-values` cases match actual pinned C# PipeWriter/TextWriter output and generated sync text/byte/async Rust paths via `fixtures/character-values.txt`. Character support is additive; broader Unicode/quote-policy equivalence is not claimed. |
@@ -40,6 +42,38 @@ An implemented row is not blanket verification of its whole feature.
 | Configurable .NET `HtmlEncoder`, broader Unicode/numeric/date formatting | Missing | Rust's five-character encoder and fixed primitive formatting are not byte-for-byte configurable C# policy parity. Requires dedicated differential cases and explicit compatibility decisions. |
 | C# initialization, pooling and disposal lifecycle | Missing | Rust borrows/re-executes reusable templates; it does not emulate C# instance disposal/pooling. #47/#11/#52 remain open scope. |
 | Razor files/`@section` syntax, async trait objects and local-only async futures | Unsupported | Current authoring is the accepted inline proc-macro mechanism, not Razor parsing. Upstream also avoids Razor `@section`; Rust sections are explicit providers. No additional authoring/API approval is implied. |
+
+## Rust compiler compatibility
+
+Two compiler-only fixes are integrated alongside the character work, without
+changing the pinned C# reference or Rust runtime defaults. Their source patches
+are `c8107ded48af02f879a726a5c88b52b6cab6fa23` (writer-name hygiene) and
+`56b7d0609f9c3c7a7a0f1e2d5f60bf1dd0177b93` (raw-identifier validation).
+Both were reviewed against their common base
+`841bf9c585209cc3415d5fdd0e1224f133ccb852` and integrated over the character
+implementation. These are Rust-specific bugs, not cross-language comparisons.
+
+Before the fixes, the new tests fail against character head `5eb0c970`:
+`{__RazorWriter::TEXT}` produces `E0599` because the generated writer type
+parameter shadows the user's type, and `r#model` is rejected as though it were
+not the required `model` field. The corrected code scans visible invocation
+identifiers, including nested/raw names, and normalizes raw spellings during
+declaration validation. It retains the existing prohibition on inner
+conditional-compilation attributes rather than allowing raw spellings to
+bypass that guard.
+
+```sh
+cargo test --locked -p razor-slices-macros
+cargo test --locked -p razor-slices --test compiler_hygiene --test compiler_raw_identifiers
+```
+
+The hygiene regression renders the same template twice and requires exact
+`&lt;first&gt;&amp;second&gt;third` output. The raw-field regression compiles both
+body spellings and owned/borrowed typed constructors; it does not execute a
+render. Three additional macro unit tests cover name selection, valid/invalid
+model declarations, and ordinary/raw struct/field conditional attributes.
+The name scan cannot observe identifiers introduced only by a later nested
+macro expansion. Broader grammar and parent-epic scope remain open.
 
 ## Reproduce the C# golden
 
