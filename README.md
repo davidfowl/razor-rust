@@ -10,8 +10,10 @@ rendering — without pulling in a full web/MVC framework.
 > [PR #61](https://github.com/davidfowl/razor-rust/pull/61), with verified async
 > value/layout deliveries #63/#65 combined in [PR #71](https://github.com/davidfowl/razor-rust/pull/71). Its source PRs
 > are consolidated here with request scope #68, automatic flush #73 and the
-> accepted inline-codegen decision #29. Source PRs remain unmerged; this is not
-> a claim that the preview is on main or released.
+> accepted inline-codegen decision #29. These deliveries were merged to main
+> through [PR #75](https://github.com/davidfowl/razor-rust/pull/75), not released.
+> The [source-pinned parity matrix](docs/parity.md) distinguishes verified
+> behavior from implemented features and remaining gaps.
 > See [#1](https://github.com/davidfowl/razor-rust/issues/1) for the live roadmap.
 
 ## What works today
@@ -22,7 +24,8 @@ rendering — without pulling in a full web/MVC framework.
 - Direct synchronous text/byte output, lazy partials, explicit or declared
   layouts, optional named sections and conditional attributes. Declared
   layouts are bypassed for child/partial rendering; explicit composition is
-  retained.
+  retained. Nested synchronous layouts retain their own section providers and
+  immediate child context, including section insertion after the body.
 - References and boxes (including `&dyn Slice` and `Box<dyn Slice>`) forward
   all rendering methods, preserving custom `render_to_string` and
   `render_to_bytes` overrides and their errors through generic dispatch.
@@ -140,9 +143,10 @@ is open. Servers run locally; no hosted preview or deployment is provided.
   values and conditional attributes. Custom Display/date formatting and broader
   encoder policy remain outside this bounded milestone.
 - [#47](https://github.com/davidfowl/razor-rust/issues/47): broader layout
-  lifecycle parity and [synchronous nested provider context #66](https://github.com/davidfowl/razor-rust/issues/66).
+  lifecycle parity. [Synchronous nested provider context #66](https://github.com/davidfowl/razor-rust/issues/66)
+  has bounded [C# differential evidence](docs/parity.md).
   Typed async declarations/context from [#64 / PR #65](https://github.com/davidfowl/razor-rust/pull/65)
-  are included in this follow-up source, still unmerged.
+  are included in the consolidated source.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /
   [#52](https://github.com/davidfowl/razor-rust/issues/52): remaining request
   metadata/service injection, portable response-start, lifecycle/flush and

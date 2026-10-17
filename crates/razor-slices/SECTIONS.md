@@ -2,9 +2,8 @@
 
 Focused synchronous section milestone [#45](https://github.com/davidfowl/razor-rust/issues/45),
 delivered in [PR #46](https://github.com/davidfowl/razor-rust/pull/46).
-This branch explicitly stacks on **Ready/unmerged #35**, which includes #33/#31.
-Integration order is #31, #33, #35, then #46. These APIs are not yet on main;
-no dependency branch is changed here.
+The original delivery stacked on #35, including #33/#31.
+These APIs were consolidated into main through #75.
 
 ## Run a complete page
 
@@ -83,8 +82,9 @@ assert_eq!(
 # Ok::<(), io::Error>(())
 ```
 
-`with_section(body, name, content)` returns `io::Result<impl Slice>`, owns the
-two slices (or their references) and the name, and never renders at construction.
+`with_section(body, name, content)` returns `io::Result<Sectioned<S, T>>`, owns the
+body, section slice (or their references) and the name, and never renders at construction.
+It retains `Slice` for slice bodies and `Layout` for layout bodies.
 Ordinary rendering forwards to the body unchanged, including its writer/string/
 byte overrides. Named rendering matches the requested name exactly, writes the
 section's body directly, or delegates to the wrapped body's sections. Chain
@@ -143,7 +143,10 @@ inner document; nested sections remain scoped to their own bodies.
 [#36](https://github.com/davidfowl/razor-rust/issues/36), preserve body section
 dispatch and bypass declarations when rendering associated section content.
 Generated declaration syntax remains in #3.
-Inherited/async section context, cancellation and lifecycle parity have focused
+Declared synchronous nested layouts now retain their own providers and original
+child context via `Layout::render_layout_section`; see
+[the differential fixture and matrix](../../docs/parity.md).
+Broader cancellation and lifecycle parity have focused
 follow-up [#47](https://github.com/davidfowl/razor-rust/issues/47) under #4, alongside
 [#11](https://github.com/davidfowl/razor-rust/issues/11); the existing async
 bridge still buffers the completed synchronous document. This is not generated

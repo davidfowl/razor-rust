@@ -211,8 +211,9 @@ re-executes one shared-borrow renderer rather than pooling/disposal of C#
 slice instances. It does not claim identical encoder policy or C# lifecycle.
 
 **Known gaps:** external-file/Razor parsing is not introduced. Typed async declarative layouts and immediate-content sections are now covered
-in [async-layouts.md](async-layouts.md) (#64/PR #65); broader synchronous context
-and lifecycle remain #66/#47. Explicit sections use
+in [async-layouts.md](async-layouts.md) (#64/PR #65); synchronous nested context
+has [bounded differential coverage](parity.md) for #66, while broader lifecycle
+remains #47. Explicit sections use
 [async-sections.md](async-sections.md). Framework response lifecycle stays
 [#52](https://github.com/davidfowl/razor-rust/issues/52)/[#56](https://github.com/davidfowl/razor-rust/issues/56).
 Cancellation tokens, native pipe accounting/flags, local-only writers and async trait

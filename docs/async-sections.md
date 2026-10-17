@@ -114,7 +114,8 @@ intentional streaming-compatible manual section overrides.
 The original #48 delivery is explicit async composition. This follow-up source
 also supports typed async declarations and render-local immediate-content
 section context in [async-layouts.md](async-layouts.md) (#64/PR #65), not shared
-ambient context. Broader synchronous provider context remains #66/#47.
+ambient context. Synchronous nested provider context (#66) now has
+[bounded C# differential coverage](parity.md); broader lifecycle remains #47.
 Generated typed async declarations and explicit section insertion are covered in
 [async-templates.md](async-templates.md) ([#58](https://github.com/davidfowl/razor-rust/issues/58)
 under [#3](https://github.com/davidfowl/razor-rust/issues/3)); HTTP
