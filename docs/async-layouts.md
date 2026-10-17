@@ -121,7 +121,7 @@ At pinned upstream
 Synchronous nested provider context (#66) now has
 [bounded C# differential coverage](parity.md), using the analogous synchronous hook.
 **Known gaps / follow-ups:** #47/#11/#52 retain initialization/disposal,
-request tokens/context, native pipe completion/accounting and encoder-policy
+request tokens/context, native pipe flush-result flags and encoder-policy
 parity. #3 retains broader grammar/value parity; #62/#63 remains independently
 delivered. Async trait objects/local-only futures are not added. Fresh Rust
 renders re-execute borrowed templates rather than reproducing C# pooling or

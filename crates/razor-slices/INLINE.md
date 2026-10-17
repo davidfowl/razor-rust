@@ -39,6 +39,14 @@ is an explicit trusted-HTML opt-out, never an automatic fallback for unsupported
 types. Do not wrap untrusted input in `HtmlString`. HTML escaping is not URL,
 JavaScript or CSS sanitization.
 
+`Option<T>` is supported when `T: WriteHtmlValue`: `None` emits nothing and
+`Some` borrows/delegates to the value without cloning, adding delimiters or
+flushing. For example, `{Some("<name>")}` emits `&lt;name&gt;`;
+`{None::<&str>}` emits nothing. Nested options and references follow the same
+rule, and unsupported contained types still fail type checking. A body
+`Some(false)` emits `false`; it does not use conditional attribute omission.
+See [bounded C# nullable-value evidence](../../docs/parity.md#optional-body-values-78).
+
 The renderer captures by `move`, using ordinary Rust ownership rules. It borrows
 each expression's result during the write rather than consuming it. Expressions
 are evaluated in order on **each render**, not at template creation. Captured

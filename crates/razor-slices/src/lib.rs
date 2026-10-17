@@ -51,7 +51,8 @@ pub use razor_slices_macros::async_template as __async_template;
 ///
 /// String literals are trusted markup; `{ expression }` uses the bounded typed
 /// [`AsyncWriteHtmlValue`] path: escaped strings, primitives, explicit trusted
-/// [`HtmlString`] and validated [`attribute()`] adapters. Nested `if`/`for`
+/// [`HtmlString`], optional values and validated [`attribute()`] adapters. `None`
+/// writes nothing; `Some` borrows/delegates to its contained value. Nested `if`/`for`
 /// use the same grammar as [`html!`]. Async-only directives:
 ///
 /// - `@{ Rust statements }` introduces render-local bindings/work (including await).
@@ -62,8 +63,9 @@ pub use razor_slices_macros::async_template as __async_template;
 ///   bypassing declared layouts but retaining explicit composition.
 /// - `@section { provider }, { name };` inserts an explicit lazy async section.
 ///
-/// No directive implicitly buffers, spawns, or flushes after a child. Only
-/// [`render_incremental`] adds a final flush on success. Unlike synchronous
+/// No directive implicitly buffers or spawns. Successful children check the
+/// sink's automatic completion-flush policy; [`render_incremental`] additionally
+/// flushes on root success. Unlike synchronous
 /// interpolation, custom values must implement the explicit async contract.
 /// See `docs/async-templates.md` and `examples/async_template.rs`.
 ///
@@ -91,7 +93,8 @@ macro_rules! async_template {
 ///
 /// String literals (including raw strings) are written verbatim. Each
 /// `{ expression }` must implement [`WriteHtmlValue`]: strings are escaped,
-/// primitives formatted, and [`HtmlString`] emitted as trusted HTML.
+/// primitives formatted, and [`HtmlString`] emitted as trusted HTML. [`Option`]
+/// omits `None` and delegates `Some` without consuming its value.
 ///
 /// Captures use Rust's `move` closure rules. Expressions run on each render,
 /// not at construction; they must not consume or mutably borrow captures

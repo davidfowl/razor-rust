@@ -1,0 +1,12 @@
+pipe-16383: flushes=0
+text-16383: flushes=0
+pipe-16384: flushes=1
+text-16384: flushes=0
+pipe-16385: flushes=1
+text-16385: flushes=0
+pipe-children: flushes=1
+text-children: flushes=0
+pipe-explicit: flushes=1
+text-explicit: flushes=1
+pipe-layout: flushes=1
+text-layout: flushes=0

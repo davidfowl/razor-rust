@@ -44,11 +44,19 @@ rendering — without pulling in a full web/MVC framework.
   boundary, not each write or arbitrary await. Plain sections are not boundaries.
   [Threshold contract and no-manual-flush sample](docs/async-rendering.md#automatic-completion-flush)
   are tracked in bounded [#72 / PR #73](https://github.com/davidfowl/razor-rust/pull/73).
+  Sinks may opt into native `unflushed_bytes()` snapshots, including prebuffered
+  or partially accepted output, without changing the default fallback.
+  TextWriter-like sinks may disable completion flushes with
+  `auto_flush_enabled() -> false`; explicit and root-final flushes still run.
+  [Exact C# accounting cases and remaining #74 scope](docs/parity.md#native-byte-accounting-74)
+  distinguish byte-count fidelity from native flush-result flags.
 - Axum adapters for atomic buffered HTML responses and bounded incremental
   streaming responses, with runnable servers and real HTTP/1 regressions
   for prefix delivery, peer-disconnect cancellation and post-start failures.
 - Generated `async_template!` interpolation for bools/numbers, escaped
-  strings/references, explicit trusted `HtmlString` and conditional attributes.
+  strings/references, optional body values, explicit trusted `HtmlString` and conditional attributes.
+  Both template paths support `Option<T>`: `None` emits nothing; `Some` delegates
+  without consuming, re-encoding or flushing its value.
   Built-ins use fixed encoding/format scratch; custom values must explicitly
   implement `AsyncWriteHtmlValue`, not just `Display` or `WriteHtmlValue`.
 - Opt-in typed, borrowed request models and cooperative cancellation scopes.

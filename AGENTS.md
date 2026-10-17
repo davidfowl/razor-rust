@@ -48,8 +48,13 @@ do not duplicate work already in progress.
   execution bypasses declared layouts, but retains explicit composition.
   Generated children, `AsyncHtmlWriter::write_slice`, supplied layout bodies and
   completed layouts check the inclusive 16,384 accepted-output-byte threshold.
-  Writes/arbitrary awaits/plain sections do not auto-flush. Root final flush
-  and explicit flush remain unchanged. Request scope #68 shares this writer's
+  Writes/arbitrary awaits/plain sections do not auto-flush. TextWriter-like
+  sinks can opt out with `AsyncSliceWriter::auto_flush_enabled() -> false`;
+  the default remains enabled. Root final flush and explicit flush remain unchanged. Optional
+  `AsyncSliceWriter::unflushed_bytes()` supplies an authoritative native snapshot;
+  the default `None` retains successful-write fallback accounting, reset when
+  flush is requested. See docs/parity.md for bounded #74 differential evidence
+  and remaining native flag/root-lifecycle gaps. Request scope #68 shares this writer's
   cancellation token with layouts and completion flushes; broader #69
   acceptance remains separate from this consolidation.
 - `AsyncSliceWriter` is runtime-agnostic. The default-off `tokio` feature adds
@@ -65,7 +70,10 @@ do not duplicate work already in progress.
   `async_template!` generates model-typed reusable `AsyncSlice` declarations
   with explicit await/flush, child and section directives. Typed async
   interpolation supports the existing bool/numeric families, strings/references,
-  trusted `HtmlString` and conditional attribute adapters. Custom values require
+  trusted `HtmlString`, optional body values and conditional attribute adapters.
+  `Option<T>` requires the contained value's explicit sync/async contract;
+  `None` does no I/O and `Some` borrows/delegates without changing trust or flushing.
+  Custom values require
   `AsyncWriteHtmlValue` (attributes also require `AsyncAttributeValue`); never
   buffer arbitrary synchronous values or infer safety from `Display`.
   Partials, conditional attributes, layouts and named sections are implemented

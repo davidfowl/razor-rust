@@ -132,7 +132,8 @@ require application cooperation and are not automatically interrupted by
 `RequestAborted`. This stronger opt-in Rust scope is explicit, not claimed
 identical .NET application-await semantics. Upstream synchronous buffer writes
 and native pipe flags are not replicated. Successful completed slices/layouts
-do check the inclusive 16,384-byte threshold in this consolidated source.
+do check the inclusive 16,384-byte threshold unless the sink disables automatic
+completion flushing. That opt-out does not disable scoped explicit/final flushes.
 
 ## Known gaps / follow-ups
 
@@ -144,6 +145,8 @@ do check the inclusive 16,384-byte threshold in this consolidated source.
   claim the entire #69 acceptance scope.
 - #52 retains automatic HTTP request metadata/service association and portable
   response start; generic request data is explicit in this milestone.
-- #11 retains native writer completion/accounting flags, disposal/initialization
-  lifecycle and broader encoder policy. The synchronous buffered bridge is
+- #11 retains native writer completion/cancellation flags, full TextWriter
+  root/lifecycle equivalence, disposal/initialization and broader encoder policy.
+  TextWriter-like completion opt-out has [bounded evidence](parity.md#textwriter-like-completion-policy).
+  The synchronous buffered bridge is
   unchanged and has no new cancellation API.

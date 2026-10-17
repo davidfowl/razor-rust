@@ -1,5 +1,29 @@
 using RazorSlices;
 
+if (args is ["optional-values"])
+{
+    await OptionalValueCases.Run();
+    return;
+}
+
+if (args is ["native-accounting"])
+{
+    await NativeSinkCases.Run();
+    return;
+}
+
+if (args is ["flush-outcomes"])
+{
+    await NativeSinkCases.RunFlushOutcomes();
+    return;
+}
+
+if (args is ["flush-policy"])
+{
+    await NativeSinkCases.RunFlushPolicy();
+    return;
+}
+
 using var document = new StringWriter();
 await new Page().RenderAsync(document);
 Console.WriteLine($"document: {document}");

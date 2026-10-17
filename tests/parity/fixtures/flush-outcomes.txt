@@ -1,0 +1,12 @@
+ready-normal: render=success,flushes=16384
+ready-canceled-flag: render=success,flushes=16384
+ready-completed-flag: render=success,flushes=16384
+ready-both-flags: render=success,flushes=16384
+held-normal: render=success,flushes=16384
+held-canceled-flag: render=success,flushes=16384
+held-completed-flag: render=success,flushes=16384
+held-both-flags: render=success,flushes=16384
+faulted-flush: original-error
+canceled-flush: cancellation-error
+textwriter-threshold: flushes=0
+textwriter-explicit: flushes=1

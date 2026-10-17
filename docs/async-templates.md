@@ -63,6 +63,14 @@ statements; the macro does not suppress must-use warnings.
 Interpolation uses the explicit `AsyncWriteHtmlValue` contract. Built-ins are
 `str`, `String`, references, `bool`, all Rust signed/unsigned integer families,
 `f32`/`f64`, trusted `HtmlString`, and validated `attribute(name, value)` adapters.
+`Option<T>` is also supported when `T` implements the explicit async contract:
+`None` performs no writes, and `Some` borrows/delegates to the existing value
+path without cloning, buffering or implicit flushing. Owned and borrowed
+optional model fields remain reusable; nested options and references delegate.
+For example, `{Some("<name>")}` emits `&lt;name&gt;` and `{None::<&str>}` emits
+nothing. Body `Some(false)` emits `false`, unlike attribute omission.
+An absent value does not bypass cancellation of the enclosing render or its
+required root-final flush. See [the bounded nullable-value comparison](parity.md#optional-body-values-78).
 Strings escape `& < > " '` once and preserve UTF-8, using the existing encoder
 in at most 1,024-byte input chunks and a fixed 6,144-byte scratch buffer.
 Integers share the synchronous 40-byte format buffer; floats share the
@@ -216,6 +224,6 @@ has [bounded differential coverage](parity.md) for #66, while broader lifecycle
 remains #47. Explicit sections use
 [async-sections.md](async-sections.md). Framework response lifecycle stays
 [#52](https://github.com/davidfowl/razor-rust/issues/52)/[#56](https://github.com/davidfowl/razor-rust/issues/56).
-Cancellation tokens, native pipe accounting/flags, local-only writers and async trait
+Broader cancellation, native pipe flush-result flags, local-only writers and async trait
 objects remain #11. Historical ADR reconciliation stays #28/PR #29.
 No epic or whole-port landing is claimed.

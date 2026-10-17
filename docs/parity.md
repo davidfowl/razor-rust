@@ -7,7 +7,7 @@ The reference is **DamianEdwards/RazorSlices at
 with `VersionPrefix` **0.12.1** in `src/Directory.Build.props`.
 This is an exact source pin, not a claim that a NuGet release or moving `main`
 was tested. It is the same reference used by the existing layout, async,
-request-context docs and issue #66.
+request-context docs and issues #66/#74.
 
 For each behavior, parity requires an observable contract: exact output,
 dispatch/order, failure behavior, or a measured streaming boundary. Matching
@@ -25,8 +25,14 @@ An implemented row is not blanket verification of its whole feature.
 | Optional, case-sensitive, repeated and whitespace section names; empty name rejected; partial bypasses all declared layouts | Verified, bounded | Same golden includes missing `page-only` (must not recurse), `Footer`, whitespace, repeated footer, bare partial and empty-name rejection. This covers ASCII literal output, not general encoder equivalence. |
 | Layout references/boxes, `Sectioned` associations/shadowing, explicit composition, original writer errors, lazy execution without flush | Implemented | `tests/nested_layout_sections.rs` plus existing `declared_layouts`, `layouts`, `sections` suites. Every byte-offset failure of the golden document is tested, retaining I/O kind/source and exact accepted prefix. These Rust-specific adapter/error contracts are not C# differential tests. |
 | Generated typed models, nested control flow, primitive/trusted/attribute values | Implemented | Runtime `inline`, `control_flow`, `async_templates`, `attributes` tests and runnable value examples; broader grammar/date/custom formatting and encoder configuration remain #3/#2. |
+| Optional body values: absent output, encoded string, nullable integer/float and trusted HTML | Verified, bounded | Twelve `optional-values` cases use both pinned C# PipeWriter/TextWriter paths and match `fixtures/optional-values.txt` in synchronous text/byte and generated async Rust paths. Rust `Option<T>` delegates `Some` and emits nothing for `None`. This does not establish broad encoder/culture/boolean formatting equivalence. |
+| Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
-| Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). Native prebuffered/partially accepted bytes and flush-result fidelity remain missing in #74. |
+| Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
+| Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags remain unrepresented under #74. |
+| Pipe versus TextWriter-like completion policy at 16,383/16,384/16,385 bytes, nested partials, explicit flush and layout completion | Verified, bounded | Twelve C# `flush-policy` cases match shared `fixtures/flush-policy.txt` and `flush_policy::pinned_csharp_golden_matches_completion_policy_not_root_final_flush`, with both Rust native/fallback counting. Default enabled; TextWriter-like opt-out suppresses completion checks, not explicit/root-final/bridge flushes. Root-final-flush contracts still differ. |
+| Opt-out through generated children, nested declared/explicit layouts and layout-owned section children; original failures, held flushes, cancellation/drop | Implemented | Six `flush_policy` regressions include these Rust adapter/error contracts, unchanged explicit/root-final/bridge flushing, and no native-counter query when disabled. These cases do not establish C# error/lifecycle equivalence. |
+| Native flush-result flags versus faulted/cancelled operations | Missing, reference characterized | The C#-only `flush-outcomes` mode below records twelve reference cases. Native flags are not exposed by Rust; the TextWriter completion subset now has separate bounded differential evidence above. |
 | Typed request scope and cancellation; buffered/streaming HTTP | Implemented | `request_context` and Axum transport tests. Broader request/layout assembly #69, framework service injection, portable response-start and lifecycle equivalence remain unverified/missing under #47/#52/#11. |
 | Configurable .NET `HtmlEncoder`, broader Unicode/numeric/date formatting | Missing | Rust's five-character encoder and fixed primitive formatting are not byte-for-byte configurable C# policy parity. Requires dedicated differential cases and explicit compatibility decisions. |
 | C# initialization, pooling and disposal lifecycle | Missing | Rust borrows/re-executes reusable templates; it does not emulate C# instance disposal/pooling. #47/#11/#52 remain open scope. |
@@ -42,7 +48,9 @@ dispatch, restore a floating package or build the Razor source generator.
 Handwritten C# slices/proxies exercise the real runtime's layout discovery,
 `ContentSlice`, `RenderBodyAsync`, `RenderSectionAsync` and partial bypass.
 This tests runtime behavior, not Razor code generation, package build metadata,
-HTTP or pipe flushing.
+HTTP, actual network delivery or package/source-generator builds. The
+`native-accounting` mode additionally exercises real upstream auto-flush
+selection against an instrumented `PipeWriter`, not a real transport.
 
 From the repository root, using an unused reference checkout path:
 
@@ -81,6 +89,180 @@ layouts but preserves explicit compositions. Associations outside an already
 declared page affect that page's consumers, not its original inner context.
 This is a reversible Rust adapter choice, not a claim of accepted new syntax.
 
-Next bounded increment: source-pin executable cases for #74's native pending-byte
-accounting and flush outcomes before designing optional sink capabilities.
+Remaining native-result work must resolve a bounded capability and
+verify ready/held outcomes against the reference cases below, preserving the
+distinction between result flags and failed operations.
 Do not count #66, passing tests, or this matrix as completion of any parent epic.
+
+## Native byte accounting (#74)
+
+Pinned `FlushTrackingPipeWriter.Create` returns a destination unchanged when
+`CanGetUnflushedBytes` is true. That native `UnflushedBytes` includes output
+buffered before rendering; `RazorSlice.AutoFlush` checks it after successful
+execution. Without the capability, the upstream wrapper starts at zero, counts
+successful `Advance` calls, and resets when flush is requested.
+
+`AsyncSliceWriter::unflushed_bytes() -> Option<usize>` supplies the analogous
+optional snapshot. The default `None` preserves existing implementations;
+`Some(count)` is the sink's authoritative current accepted/unflushed byte count,
+not capacity or a lifetime total. In particular, `Some(0)` must not fall back
+to successful-write accounting. A native count survives fresh output borrows
+and partial acceptance before a write error/cancellation. The runtime only
+queries it at existing successful child/layout completion boundaries when automatic
+flushing is enabled.
+No mandatory runtime/dependency, per-write flush, counter adapter for arbitrary
+Tokio writers, implicit error recovery or new final-flush policy is added.
+This is a reversible optional Rust capability, not claimed maintainer API acceptance.
+
+Reproduce the eight C# cases after the reference checkout above:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- native-accounting > target/csharp-native-byte-accounting.txt
+diff -u crates/razor-slices/tests/fixtures/native-byte-accounting.txt \
+  target/csharp-native-byte-accounting.txt
+cargo test --locked -p razor-slices --test native_byte_accounting --test automatic_flush
+```
+
+The [C# cases](../tests/parity/NativeSinkCases.cs) call the unchanged upstream
+runtime with an instrumented native/non-native `PipeWriter`. They compare exact
+flush counts at the threshold, empty-slice completion with prebuffered output,
+a below-threshold snapshot, already-draining sinks, and native/fallback state
+after a partially accepted failed write followed by a separate successful render.
+The [golden](../crates/razor-slices/tests/fixtures/native-byte-accounting.txt)
+also checks that failed execution itself does not auto-flush.
+Rust-specific regressions additionally cover original errors, pending/failed/
+dropped native flushes, cancellation after partial acceptance, generated children,
+layouts, section-owned children, explicit/final flushes and reborrowed output.
+A real Tokio `BufWriter` regression reports its actual buffered length, preloads
+16,383 bytes and inserts a one-byte child over a one-byte duplex. The reader
+must receive the entire threshold-sized prefix before releasing later template
+work; without the native completion flush this handshake cannot complete.
+Its buffer capacity exceeds the prefix, preventing an incidental capacity flush
+from satisfying the test. This is bounded buffered-I/O evidence, not TCP delivery.
+Boundary regressions also combine prebuffered bytes with generated escaped UTF-8,
+numeric and conditional-attribute output at 16,383/16,384/16,385 bytes, checking
+that the native count is queried once at completion rather than per value.
+
+These cases do not equate .NET `PipeWriter.Advance` with every possible Rust
+`write_all` implementation. A native provider must supply a truthful snapshot.
+Default fallback cannot discover bytes the trait implementation does not report.
+`flush -> io::Result<()>` still does not expose native `FlushResult` cancellation/
+completion flags. Completion opt-out below does not make Rust root-final-flush
+or slice/destination lifecycle identical to C#. Keep #74/#11/#52 open for
+remaining scope; the whole runtime is not at verified C# parity.
+
+### TextWriter-like completion policy
+
+The pinned C# TextWriter path does not auto-flush at slice completion.
+`AsyncSliceWriter::auto_flush_enabled() -> bool` defaults to `true`, retaining
+all existing pipe-like sinks. An adapter can return `false` to suppress the
+shared child/layout completion check, including native-counter queries.
+No sink-type guessing or configurable threshold is added.
+
+Reproduce the twelve shared policy cases:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- flush-policy > target/csharp-flush-policy.txt
+diff -u crates/razor-slices/tests/fixtures/flush-policy.txt target/csharp-flush-policy.txt
+cargo test --locked -p razor-slices --test flush_policy
+```
+
+The C# harness uses the real PipeWriter and TextWriter render paths; Rust
+uses completion boundaries on `AsyncHtmlWriter`, **not** `render_incremental`.
+Both verify exact ASCII output and compare flush counts below/at/above the
+threshold, two half-sized partials, explicit flush and a half-body/half-layout
+document. Rust repeats the golden for native and fallback accounting.
+Six focused Rust regressions additionally verify generated children, nested
+declared/explicit layouts, repeated layout-owned section children, no native
+queries while disabled, accepted output/error sources, held explicit/final
+flushes, cancellation and dropping the render.
+
+Explicit flushes, the root `render_incremental` final flush and the buffered
+`render_async` bridge remain mandatory on success regardless of this hook;
+their errors and scoped cancellation remain failures, not successful fallbacks.
+Raw C# TextWriter root rendering has no corresponding final flush. This is
+bounded **completion-policy** parity, not identical root or lifetime semantics.
+The additive hook is a reversible adapter mapping, not claimed maintainer
+API acceptance.
+
+### Remaining flush outcomes and TextWriter policy
+
+The same unchanged C# runtime is executable in `flush-outcomes` mode:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- flush-outcomes > target/csharp-flush-outcomes.txt
+diff -u tests/parity/fixtures/flush-outcomes.txt target/csharp-flush-outcomes.txt
+```
+
+The [C#-only reference golden](../tests/parity/fixtures/flush-outcomes.txt)
+characterizes twelve cases; it is **not** asserted by Rust CI or evidence that
+Rust exposes native result flags:
+
+- Both ready and held auto-flush operations complete rendering successfully
+  for all four `FlushResult.IsCanceled`/`IsCompleted` combinations. The pinned
+  renderer awaits completion but does not inspect these flags. A held flush
+  still blocks render completion until released.
+- A faulted flush preserves its original exception; an actually cancelled
+  flush operation propagates cancellation. A nonfaulted result's canceled
+  **flag** is therefore not equivalent to a cancelled operation.
+- A `TextWriter` receiving 16,384 literal characters does not auto-flush;
+  an explicit template flush invokes it once.
+
+Do not invent a native-flag error policy from names alone or collapse actual
+fault/cancellation into success. The current Rust sink has only
+`flush -> io::Result<()>` and cannot represent native result flags. The
+TextWriter-like completion opt-out above does not expose those flags or change
+the intentionally preserved root-final-flush contract. A follow-up must compare
+observable render outcomes before claiming further parity.
+
+## Optional body values (#78)
+
+The pinned runtime's `RazorSlice.Write.cs` skips null strings/content and
+null generic values; non-null values retain their existing typed dispatch.
+Before this increment, both `html!` and `async_template!` rejected
+`Option<&str>` body interpolation with `E0277`, even though conditional
+attributes already had their own `Option` contract.
+
+`WriteHtmlValue for Option<T>` and `AsyncWriteHtmlValue for Option<T>` are
+additive delegating implementations, not new syntax or a formatting API.
+`None` performs no destination I/O; `Some` borrows the value and preserves its
+encoding, trust, fixed scratch bounds, original errors and awaited backpressure.
+The contained type must implement the relevant contract, even for `None`;
+there is no `Display` coercion or sync-to-async buffer. Rust-specific nesting,
+references and custom explicit implementations compose without cloning.
+Body `Some(false)` still emits Rust's existing `false`, not an omitted attribute.
+Cancellation still interrupts an enclosing render of absent values, and root
+final flushes remain unchanged. Attribute omission rules are untouched.
+
+Reproduce the twelve shared cases against the same pinned source:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- optional-values > target/csharp-optional-values.txt
+diff -u crates/razor-slices/tests/fixtures/optional-values.txt target/csharp-optional-values.txt
+cargo test --locked -p razor-slices --test optional_values
+```
+
+The [C# harness](../tests/parity/OptionalValueCases.cs) executes both actual
+PipeWriter and TextWriter render paths and requires identical output before
+printing the shared golden. Cases cover null/empty/encoded ASCII strings,
+null/zero/negative/minimum/maximum integers, absent/trusted HTML including
+raw UTF-8, and an absent/present `1.5` double under invariant culture.
+Rust compares exact output on generated sync text/byte and async paths.
+The [golden](../crates/razor-slices/tests/fixtures/optional-values.txt) is checked
+by Rust CI; updating it requires an explicit unchanged-source C# run.
+
+Seven Rust regressions additionally cover reusable owned and non-Clone custom
+values, references/nesting, absent values against a failing destination,
+every accepted-byte failure offset, original final-flush errors, held writes,
+cancellation/drop and bounded encoding/completion accounting. Two compile-fail
+doctests retain rejection of unsupported optional payload types.
+This is bounded nullable-value dispatch/output evidence, not full .NET encoder,
+culture/date/number/boolean formatting or instance-lifecycle equivalence.
