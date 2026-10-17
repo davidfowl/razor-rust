@@ -10,7 +10,8 @@ use quote::quote;
 use std::collections::BTreeSet;
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    braced, parenthesized, Block, Expr, Fields, ItemStruct, LitStr, Pat, Result, Stmt, Token,
+    braced, ext::IdentExt, parenthesized, Block, Expr, Fields, ItemStruct, LitStr, Pat, Result,
+    Stmt, Token,
 };
 
 mod directive {
@@ -272,7 +273,7 @@ impl Parse for AsyncTemplate {
                     && fields.named[0]
                         .ident
                         .as_ref()
-                        .is_some_and(|name| name == "model") => {}
+                        .is_some_and(|name| name.unraw() == "model") => {}
             _ => {
                 return Err(syn::Error::new_spanned(
                     &declaration,
@@ -285,7 +286,10 @@ impl Parse for AsyncTemplate {
             .iter()
             .chain(declaration.fields.iter().flat_map(|field| &field.attrs))
         {
-            if attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr") {
+            if attribute.path().get_ident().is_some_and(|name| {
+                let name = name.unraw();
+                name == "cfg" || name == "cfg_attr"
+            }) {
                 return Err(syn::Error::new_spanned(
                     attribute,
                     "apply conditional compilation to the async_template! invocation",
@@ -462,5 +466,49 @@ mod tests {
             assert!(syn::parse_str::<AsyncTemplate>(input).is_err(), "{input}");
         }
         assert!(syn::parse_str::<Template>("(runtime) @flush;").is_err());
+    }
+
+    #[test]
+    fn raw_identifiers_preserve_model_field_validation() {
+        for input in [
+            "(runtime) struct Page { r#model: String } => { {model} {r#model} }",
+            "(runtime) struct Page<'a> { r#model: &'a str } => { {model} }",
+        ] {
+            assert!(syn::parse_str::<AsyncTemplate>(input).is_ok(), "{input}");
+        }
+        for input in [
+            "(runtime) struct Page { r#other: String } => {}",
+            "(runtime) struct Page { r#model: String, extra: String } => {}",
+        ] {
+            let error = syn::parse_str::<AsyncTemplate>(input).err().unwrap();
+            assert_eq!(
+                error.to_string(),
+                "expected a struct with exactly one named model field",
+                "{input}"
+            );
+        }
+    }
+
+    #[test]
+    fn raw_identifiers_preserve_conditional_compilation_validation() {
+        for input in [
+            "(runtime) #[cfg(any())] struct Page { model: String } => {}",
+            "(runtime) #[cfg_attr(all(), cfg(any()))] struct Page { model: String } => {}",
+            "(runtime) #[r#cfg(any())] struct Page { model: String } => {}",
+            "(runtime) #[r#cfg_attr(all(), cfg(any()))] struct Page { model: String } => {}",
+            "(runtime) struct Page { #[cfg(any())] model: String } => {}",
+            "(runtime) struct Page { #[cfg_attr(all(), cfg(any()))] model: String } => {}",
+            "(runtime) struct Page { #[r#cfg(any())] model: String } => {}",
+            "(runtime) struct Page { #[r#cfg_attr(all(), cfg(any()))] model: String } => {}",
+            "(runtime) struct Page { #[r#cfg(any())] r#model: String } => {}",
+            "(runtime) struct Page { #[r#cfg_attr(all(), cfg(any()))] r#model: String } => {}",
+        ] {
+            let error = syn::parse_str::<AsyncTemplate>(input).err().unwrap();
+            assert_eq!(
+                error.to_string(),
+                "apply conditional compilation to the async_template! invocation",
+                "{input}"
+            );
+        }
     }
 }
