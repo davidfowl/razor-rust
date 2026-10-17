@@ -201,7 +201,14 @@ fn generate_parts(
             let body = generate_parts(body, runtime, writer, syntax);
             quote! { for #pattern in #iterator { #body } }
         }
-        Part::Code(statements) => quote! { #(#statements)* },
+        Part::Code(statements) => {
+            let statements = statements.into_iter().map(|statement| match statement {
+                // Preserve unit block semantics without hiding preceding bindings.
+                Stmt::Expr(expression, None) => quote! { { #expression } },
+                statement => quote! { #statement },
+            });
+            quote! { #(#statements)* }
+        }
         Part::Await { future, propagate } => {
             let question = propagate.then(|| quote! { ? });
             quote! { let (): () = (#future).await #question; }
