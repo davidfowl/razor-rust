@@ -185,6 +185,17 @@ impl<const N: usize> fmt::Write for FixedBuf<N> {
 /// into a small stack buffer (no heap allocation in the common case), while
 /// string-like values are HTML-encoded via [`encode_html_to_writer`]. See
 /// <https://github.com/davidfowl/razor-rust/issues/10>.
+///
+/// References and [`Option`] delegate without consuming the contained value.
+/// `None` writes nothing; `Some(value)` preserves that value's existing
+/// encoding/trust contract and original errors, without an implicit flush.
+///
+/// Optional values still require an explicitly supported contained type:
+///
+/// ```compile_fail
+/// use razor_slices::html;
+/// let _ = html! { {None::<std::net::Ipv4Addr>} };
+/// ```
 pub trait WriteHtmlValue {
     /// Writes this value's HTML representation to `writer`.
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()>;
@@ -193,6 +204,15 @@ pub trait WriteHtmlValue {
 impl<T: WriteHtmlValue + ?Sized> WriteHtmlValue for &T {
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         (**self).write_html_to(writer)
+    }
+}
+
+impl<T: WriteHtmlValue> WriteHtmlValue for Option<T> {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        match self {
+            Some(value) => value.write_html_to(writer),
+            None => Ok(()),
+        }
     }
 }
 

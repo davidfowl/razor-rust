@@ -25,6 +25,8 @@ An implemented row is not blanket verification of its whole feature.
 | Optional, case-sensitive, repeated and whitespace section names; empty name rejected; partial bypasses all declared layouts | Verified, bounded | Same golden includes missing `page-only` (must not recurse), `Footer`, whitespace, repeated footer, bare partial and empty-name rejection. This covers ASCII literal output, not general encoder equivalence. |
 | Layout references/boxes, `Sectioned` associations/shadowing, explicit composition, original writer errors, lazy execution without flush | Implemented | `tests/nested_layout_sections.rs` plus existing `declared_layouts`, `layouts`, `sections` suites. Every byte-offset failure of the golden document is tested, retaining I/O kind/source and exact accepted prefix. These Rust-specific adapter/error contracts are not C# differential tests. |
 | Generated typed models, nested control flow, primitive/trusted/attribute values | Implemented | Runtime `inline`, `control_flow`, `async_templates`, `attributes` tests and runnable value examples; broader grammar/date/custom formatting and encoder configuration remain #3/#2. |
+| Optional body values: absent output, encoded string, nullable integer/float and trusted HTML | Verified, bounded | Twelve `optional-values` cases use both pinned C# PipeWriter/TextWriter paths and match `fixtures/optional-values.txt` in synchronous text/byte and generated async Rust paths. Rust `Option<T>` delegates `Some` and emits nothing for `None`. This does not establish broad encoder/culture/boolean formatting equivalence. |
+| Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
 | Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
 | Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags remain unrepresented under #74. |
@@ -87,7 +89,7 @@ layouts but preserves explicit compositions. Associations outside an already
 declared page affect that page's consumers, not its original inner context.
 This is a reversible Rust adapter choice, not a claim of accepted new syntax.
 
-Next bounded increment: resolve a bounded native flush-result capability and
+Remaining native-result work must resolve a bounded capability and
 verify ready/held outcomes against the reference cases below, preserving the
 distinction between result flags and failed operations.
 Do not count #66, passing tests, or this matrix as completion of any parent epic.
@@ -218,3 +220,49 @@ fault/cancellation into success. The current Rust sink has only
 TextWriter-like completion opt-out above does not expose those flags or change
 the intentionally preserved root-final-flush contract. A follow-up must compare
 observable render outcomes before claiming further parity.
+
+## Optional body values (#78)
+
+The pinned runtime's `RazorSlice.Write.cs` skips null strings/content and
+null generic values; non-null values retain their existing typed dispatch.
+Before this increment, both `html!` and `async_template!` rejected
+`Option<&str>` body interpolation with `E0277`, even though conditional
+attributes already had their own `Option` contract.
+
+`WriteHtmlValue for Option<T>` and `AsyncWriteHtmlValue for Option<T>` are
+additive delegating implementations, not new syntax or a formatting API.
+`None` performs no destination I/O; `Some` borrows the value and preserves its
+encoding, trust, fixed scratch bounds, original errors and awaited backpressure.
+The contained type must implement the relevant contract, even for `None`;
+there is no `Display` coercion or sync-to-async buffer. Rust-specific nesting,
+references and custom explicit implementations compose without cloning.
+Body `Some(false)` still emits Rust's existing `false`, not an omitted attribute.
+Cancellation still interrupts an enclosing render of absent values, and root
+final flushes remain unchanged. Attribute omission rules are untouched.
+
+Reproduce the twelve shared cases against the same pinned source:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- optional-values > target/csharp-optional-values.txt
+diff -u crates/razor-slices/tests/fixtures/optional-values.txt target/csharp-optional-values.txt
+cargo test --locked -p razor-slices --test optional_values
+```
+
+The [C# harness](../tests/parity/OptionalValueCases.cs) executes both actual
+PipeWriter and TextWriter render paths and requires identical output before
+printing the shared golden. Cases cover null/empty/encoded ASCII strings,
+null/zero/negative/minimum/maximum integers, absent/trusted HTML including
+raw UTF-8, and an absent/present `1.5` double under invariant culture.
+Rust compares exact output on generated sync text/byte and async paths.
+The [golden](../crates/razor-slices/tests/fixtures/optional-values.txt) is checked
+by Rust CI; updating it requires an explicit unchanged-source C# run.
+
+Seven Rust regressions additionally cover reusable owned and non-Clone custom
+values, references/nesting, absent values against a failing destination,
+every accepted-byte failure offset, original final-flush errors, held writes,
+cancellation/drop and bounded encoding/completion accounting. Two compile-fail
+doctests retain rejection of unsupported optional payload types.
+This is bounded nullable-value dispatch/output evidence, not full .NET encoder,
+culture/date/number/boolean formatting or instance-lifecycle equivalence.

@@ -54,7 +54,9 @@ rendering — without pulling in a full web/MVC framework.
   streaming responses, with runnable servers and real HTTP/1 regressions
   for prefix delivery, peer-disconnect cancellation and post-start failures.
 - Generated `async_template!` interpolation for bools/numbers, escaped
-  strings/references, explicit trusted `HtmlString` and conditional attributes.
+  strings/references, optional body values, explicit trusted `HtmlString` and conditional attributes.
+  Both template paths support `Option<T>`: `None` emits nothing; `Some` delegates
+  without consuming, re-encoding or flushing its value.
   Built-ins use fixed encoding/format scratch; custom values must explicitly
   implement `AsyncWriteHtmlValue`, not just `Display` or `WriteHtmlValue`.
 - Opt-in typed, borrowed request models and cooperative cancellation scopes.

@@ -70,7 +70,10 @@ do not duplicate work already in progress.
   `async_template!` generates model-typed reusable `AsyncSlice` declarations
   with explicit await/flush, child and section directives. Typed async
   interpolation supports the existing bool/numeric families, strings/references,
-  trusted `HtmlString` and conditional attribute adapters. Custom values require
+  trusted `HtmlString`, optional body values and conditional attribute adapters.
+  `Option<T>` requires the contained value's explicit sync/async contract;
+  `None` does no I/O and `Some` borrows/delegates without changing trust or flushing.
+  Custom values require
   `AsyncWriteHtmlValue` (attributes also require `AsyncAttributeValue`); never
   buffer arbitrary synchronous values or infer safety from `Display`.
   Partials, conditional attributes, layouts and named sections are implemented

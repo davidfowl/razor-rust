@@ -1,5 +1,11 @@
 using RazorSlices;
 
+if (args is ["optional-values"])
+{
+    await OptionalValueCases.Run();
+    return;
+}
+
 if (args is ["native-accounting"])
 {
     await NativeSinkCases.Run();
