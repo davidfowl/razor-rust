@@ -53,3 +53,7 @@ required-features = ["tokio"]
 [[example]]
 name = "automatic_flush"
 required-features = ["tokio"]
+
+[[example]]
+name = "request_context"
+required-features = ["tokio"]

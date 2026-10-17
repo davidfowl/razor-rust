@@ -12,8 +12,8 @@ use axum::{
 };
 use http_body_util::{BodyExt, Empty};
 use razor_slices::{
-    html, AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter, HtmlString, Slice,
-    WriteHtmlValue,
+    async_template, html, AsyncHtmlWriter, AsyncRenderError, AsyncSlice, AsyncSliceWriter,
+    CancellationToken, HtmlString, RenderCancelled, RenderContext, Slice, WriteHtmlValue,
 };
 use razor_slices_axum::{SliceResponse, StreamingSliceResponse};
 use tower::ServiceExt;
@@ -704,16 +704,20 @@ impl AsyncSlice for DisconnectPage {
 async fn real_peer_disconnect(write_until_disconnected: bool) {
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
         let state = Arc::new(DisconnectState::default());
+        let token = CancellationToken::new();
+        let captured_token = token.clone();
         let captured = state.clone();
         let app = Router::new().route(
             "/",
             get(move || {
                 let state = captured.clone();
+                let token = captured_token.clone();
                 async move {
                     StreamingSliceResponse::new(DisconnectPage {
                         state,
                         write_until_disconnected,
                     })
+                    .with_cancellation_token(token)
                 }
             }),
         );
@@ -743,6 +747,7 @@ async fn real_peer_disconnect(write_until_disconnected: bool) {
         state.suspended.notified().await;
         assert_eq!(state.drop_count.load(Ordering::SeqCst), 0);
         assert_eq!(state.completed.load(Ordering::SeqCst), 0);
+        assert!(!token.is_cancelled());
 
         // Aborting the client driver closes its TCP socket, not the server body.
         connection.0.abort();
@@ -750,6 +755,8 @@ async fn real_peer_disconnect(write_until_disconnected: bool) {
         drop(output);
         drop(client);
         state.dropped.notified().await;
+        token.cancelled().await;
+        assert!(token.is_cancelled());
         assert_eq!(state.drop_count.load(Ordering::SeqCst), 1);
         assert_eq!(
             state.dropped_during_write.load(Ordering::SeqCst),
@@ -1120,4 +1127,234 @@ async fn real_peer_disconnect_drops_combined_declared_layout_section_await() {
     })
     .await
     .expect("disconnect must drop the combined nested layout renderer");
+}
+
+#[tokio::test]
+async fn explicit_token_cancellation_is_logged_original_body_error_not_eof() {
+    let page = counted_page();
+    let completed = page.completed.clone();
+    let dropped = page.dropped.clone();
+    let token = CancellationToken::new();
+    let mut output = StreamingSliceResponse::new(page)
+        .with_cancellation_token(token.clone())
+        .into_response()
+        .into_body();
+    assert_eq!(
+        output.frame().await.unwrap().unwrap().into_data().unwrap(),
+        b"prefix".as_slice()
+    );
+    let logs = Logs(Arc::new(Mutex::new(Vec::new())));
+    let subscriber = tracing_subscriber::fmt()
+        .without_time()
+        .with_ansi(false)
+        .with_writer(logs.clone())
+        .finish();
+    token.cancel();
+    let error = output
+        .collect()
+        .with_subscriber(subscriber)
+        .await
+        .unwrap_err();
+    match rendering_error(&error) {
+        AsyncRenderError::Write(error) => {
+            assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+            assert!(error.get_ref().unwrap().is::<RenderCancelled>());
+        }
+        other => panic!("cancellation source lost: {other:?}"),
+    }
+    assert_eq!(completed.load(Ordering::SeqCst), 0);
+    assert_eq!(dropped.load(Ordering::SeqCst), 1);
+    let recorded = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
+    assert!(recorded.contains("request rendering cancelled"));
+    assert!(
+        recorded.contains("error_kind=Some(Interrupted)"),
+        "{recorded}"
+    );
+}
+
+#[tokio::test]
+async fn token_cancellation_interrupts_bounded_pending_body_write() {
+    let completed = Arc::new(AtomicUsize::new(0));
+    let response = StreamingSliceResponse::new(LargePage {
+        text: "x".repeat(64 * 1_024),
+        completed: completed.clone(),
+    });
+    let token = response.cancellation_token().clone();
+    let mut output = response.into_response().into_body();
+    assert_eq!(
+        output
+            .frame()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_data()
+            .unwrap()
+            .len(),
+        1_024
+    );
+    assert_eq!(completed.load(Ordering::SeqCst), 0);
+    token.cancel();
+    loop {
+        match output.frame().await {
+            Some(Ok(frame)) => assert!(frame.into_data().unwrap().len() <= 1_024),
+            Some(Err(error)) => {
+                match rendering_error(&error) {
+                    AsyncRenderError::Write(error) => {
+                        assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+                        assert!(error.get_ref().unwrap().is::<RenderCancelled>());
+                    }
+                    other => panic!("unexpected error: {other:?}"),
+                }
+                break;
+            }
+            None => panic!("cancelled pending write returned successful EOF"),
+        }
+    }
+    assert_eq!(completed.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn unfinished_unpolled_drop_signals_token_but_successful_eof_does_not() {
+    let response = StreamingSliceResponse::new(EmptyAsync);
+    let token = response.cancellation_token().clone();
+    let unpolled_body = response.into_response().into_body();
+    assert!(!token.is_cancelled());
+    drop(unpolled_body);
+    assert!(token.is_cancelled());
+    let response = StreamingSliceResponse::new(EmptyAsync);
+    let token = response.cancellation_token().clone();
+    assert!(body(response.into_response()).await.is_empty());
+    assert!(!token.is_cancelled());
+}
+
+struct RequestData {
+    name: String,
+    entered: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+    completed: AtomicUsize,
+}
+
+async_template! {
+    struct RequestChild { model: Arc<RenderContext<RequestData>> } => {
+        "<p>" {&model.request().name} "</p>"
+    }
+}
+
+async_template! {
+    struct RequestPage { model: Arc<RenderContext<RequestData>> } => {
+        "<h1>" {&model.request().name} "</h1>"
+        @flush;
+        @{ model.request().entered.notify_one(); }
+        @await {model.request().release.notified()};
+        @render {RequestChild::new(model.clone())};
+        @{ model.request().completed.fetch_add(1, Ordering::SeqCst); }
+    }
+}
+
+#[tokio::test]
+async fn real_http_request_contexts_are_isolated_and_explicit_cancellation_fails_transfer() {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let make = |name: &str| {
+            Arc::new(RenderContext::new(
+                RequestData {
+                    name: name.to_owned(),
+                    entered: tokio::sync::Notify::new(),
+                    release: tokio::sync::Notify::new(),
+                    completed: AtomicUsize::new(0),
+                },
+                CancellationToken::new(),
+            ))
+        };
+        let a = make("<a>");
+        let b = make("&b");
+        let captured_a = a.clone();
+        let captured_b = b.clone();
+        let app = Router::new()
+            .route(
+                "/a",
+                get(move || {
+                    let context = captured_a.clone();
+                    async move {
+                        StreamingSliceResponse::new(RequestPage::new(context.clone()))
+                            .with_status(StatusCode::CREATED)
+                            .with_cancellation_token(context.cancellation_token().clone())
+                    }
+                }),
+            )
+            .route(
+                "/b",
+                get(move || {
+                    let context = captured_b.clone();
+                    async move {
+                        StreamingSliceResponse::new(RequestPage::new(context.clone()))
+                            .with_cancellation_token(context.cancellation_token().clone())
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let mut server = AbortOnDrop(tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        }));
+        let (mut client_a, connection_a) = http_client(address).await;
+        let (mut client_b, connection_b) = http_client(address).await;
+        let mut connection_a = AbortOnDrop(connection_a);
+        let mut connection_b = AbortOnDrop(connection_b);
+        let request = |path| {
+            Request::builder()
+                .uri(path)
+                .header("host", address.to_string())
+                .body(Empty::new())
+                .unwrap()
+        };
+        let response_a = client_a.send_request(request("/a")).await.unwrap();
+        let response_b = client_b.send_request(request("/b")).await.unwrap();
+        assert_eq!(response_a.status(), StatusCode::CREATED);
+        assert_eq!(response_b.status(), StatusCode::OK);
+        assert_eq!(
+            response_a.headers()["content-type"],
+            "text/html; charset=utf-8"
+        );
+        let mut output_a = response_a.into_body();
+        let mut output_b = response_b.into_body();
+        let read_prefix = |output: hyper::body::Incoming, expected: &'static [u8]| async move {
+            let mut output = output;
+            let mut prefix = Vec::new();
+            while prefix.len() < expected.len() {
+                prefix.extend_from_slice(
+                    &output.frame().await.unwrap().unwrap().into_data().unwrap(),
+                );
+            }
+            assert_eq!(prefix, expected);
+            output
+        };
+        output_a = read_prefix(output_a, b"<h1>&lt;a&gt;</h1>").await;
+        output_b = read_prefix(output_b, b"<h1>&amp;b</h1>").await;
+        a.request().entered.notified().await;
+        b.request().entered.notified().await;
+        a.cancellation_token().cancel();
+        assert!(
+            output_a.collect().await.is_err(),
+            "HTTP cancellation must fail transfer"
+        );
+        assert_eq!(a.request().completed.load(Ordering::SeqCst), 0);
+        assert!(!b.cancellation_token().is_cancelled());
+        b.request().release.notify_one();
+        assert_eq!(
+            output_b.collect().await.unwrap().to_bytes(),
+            b"<p>&amp;b</p>".as_slice()
+        );
+        assert_eq!(b.request().completed.load(Ordering::SeqCst), 1);
+        assert!(!b.cancellation_token().is_cancelled());
+        drop(client_a);
+        drop(client_b);
+        connection_a.0.abort();
+        connection_b.0.abort();
+        let _ = (&mut connection_a.0).await;
+        let _ = (&mut connection_b.0).await;
+        server.0.abort();
+        assert!((&mut server.0).await.unwrap_err().is_cancelled());
+    })
+    .await
+    .expect("isolated request-context HTTP handshake must not deadlock");
 }

@@ -13,6 +13,13 @@ It targets main with all unmerged dependencies below; none of the source
 branches are modified. Main was refreshed at
 `123e62dd695a2ec0fb4400f7a27179f6c6bc543d`.
 
+The [#67 / PR #68](https://github.com/davidfowl/razor-rust/pull/68)
+request-scope follow-up starts from verified Ready/unmerged #63 at
+`43056c1cc10f96c92cdfd0c04aeec42b745024c3`. It adds opt-in typed request
+models/cooperative tokens and Axum scope notification without changing #63
+or frozen #61. This consolidation also includes #65 async layout dispatch
+through #73's existing ancestry; broader request/layout acceptance remains #69.
+
 ## Exact source deliveries
 
 | PR | Head | Scope |
@@ -162,9 +169,10 @@ layout/section context in [#64 / PR #65](https://github.com/davidfowl/razor-rust
 see [async-layouts.md](async-layouts.md) for exact full/partial output and its
 observable section handshake. Synchronous nested provider context remains
 [#66](https://github.com/davidfowl/razor-rust/issues/66), with broader layout
-lifecycle in #47. The #61 source heads above remain frozen. Request context/tokens, portable
+lifecycle in #47. The #61 source heads above remain frozen. Bounded typed request
+models and cooperative cancellation are documented in
+[request-context.md](request-context.md); automatic completed-slice threshold
+flush is also included. Automatic request metadata/service injection, portable
 explicit response-start, native-pipe lifecycle/accounting and broader encoder policy
-remain #52/#11. The separately delivered #68 request-scope source is not part
-of this pinned assembly; combined token/layout acceptance remains focused #69,
-not a tested claim here. Proxy/HTTP2 behavior and complete .NET parity are not inferred
+remain #52/#11. Proxy/HTTP2 behavior and complete .NET parity are not inferred
 from local HTTP/1 tests. Broader benchmark parity remains #8.

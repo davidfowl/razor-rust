@@ -134,8 +134,10 @@ side effects belong to the implementation; no output is cached and no state
 is reset. Shared borrowing allows reuse but does not guarantee deterministic
 output from stateful templates.
 
-Drop the rendering future to stop polling it. There is no built-in
-cancellation token, rollback or writer shutdown. A pending destination write
+Drop the rendering future to stop polling it. The existing entry point has no
+implicit token scope. Opt into typed request state and observable cooperative
+cancellation with [`render_incremental_with_context`](request-context.md).
+Neither path provides rollback or writer shutdown. A pending destination write
 can have accepted part of its input; independently spawned application work
 may continue. Do not restart cancelled rendering on the same destination
 expecting an atomic replacement. Application futures own their cancellation
@@ -163,8 +165,9 @@ Upstream auto-flushes pipes at successful 16 KiB slice completion and disposes
 slice instances; this reusable Rust path checks completed children/layouts and
 also retains its stronger unconditional final-flush contract on root success,
 and leaves the destination caller-owned. It does not interpret `PipeWriter`
-completion/cancellation flags, provide cancellation tokens, implement the
-default C# encoder's broader Unicode allow-list, or add HTTP response integration.
+completion/cancellation flags or implement the default C# encoder's broader
+Unicode allow-list. The additive [request scope](request-context.md) provides
+portable tokens; the separate Axum crate provides bounded HTTP integration.
 Generated declarations and explicit awaits are covered separately in
 [async-templates.md](async-templates.md).
 

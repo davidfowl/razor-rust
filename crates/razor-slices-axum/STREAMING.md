@@ -133,8 +133,13 @@ Dropping the body drops the renderer and stops polling its application awaits,
 including while a write is backpressured. There is no producer task to leak
 or restart. Bytes already accepted are not rolled back and independently
 spawned application work is not cancelled. Peer-disconnect detection/body
-drop is controlled by Hyper/Axum; this adds no standalone request cancellation
-token. Panics/allocator failures are not caught.
+drop is controlled by Hyper/Axum. Each response now carries a dedicated
+cooperative token, accessible through `cancellation_token()` or supplied with
+`with_cancellation_token(token)`. Unfinished body drop signals it; successful
+render completion does not. Explicit cancellation becomes a logged `Interrupted`
+body error with typed `RenderCancelled` source. Panics/allocator failures are
+not caught. See [typed request scopes](../../docs/request-context.md) for
+application binding, exact output and portable lifetime limitations.
 
 The real HTTP/1 disconnect tests receive a prefix over TCP, then abort and
 join the client connection driver to close its socket. Before stopping the
@@ -146,7 +151,8 @@ write, not successful completion or a later application wait. Owned client
 and server task guards also abort on assertion failure or timeout.
 Notifications synchronize the tests without sleeps; a timeout only detects
 deadlocks. This verifies framework-triggered body drop on the supported
-local HTTP/1 transport, not a standalone request-aborted token, exact TCP
+local HTTP/1 transport, now including notification of its dedicated token,
+not a portable disconnect-detection API, exact TCP
 buffer capacity, disconnect-detection deadline, or proxy/HTTP/2 behavior.
 
 ## Verification and remaining parity
@@ -176,14 +182,16 @@ the first write, without claiming identical forced-start/PipeWriter semantics.
 It preserves streaming order and post-start failure rather than buffered
 500 replacement.
 
-Request cancellation tokens, native writer completion/accounting flags,
-disposal and broader .NET encoder policy remain
+Typed request models/cooperative tokens are the additive
+[#67](https://github.com/davidfowl/razor-rust/issues/67) milestone.
+Automatic completed-slice threshold flush is included. Native writer
+completion/accounting flags, disposal and broader .NET encoder policy remain
 [#11](https://github.com/davidfowl/razor-rust/issues/11).
 Real disconnect regression coverage is tracked by
 [#54](https://github.com/davidfowl/razor-rust/issues/54);
 empty-prefix HTTP/1 response commitment is tracked by
 [#56](https://github.com/davidfowl/razor-rust/issues/56).
-Request context/tokens and a portable explicit response-start API remain
+Automatic request metadata/services and a portable explicit response-start API remain
 [#52](https://github.com/davidfowl/razor-rust/issues/52).
 Generated async templates remain [#3](https://github.com/davidfowl/razor-rust/issues/3);
 inherited layout/section context remains
