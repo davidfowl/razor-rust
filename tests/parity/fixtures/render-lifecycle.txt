@@ -1,0 +1,8 @@
+text/sync/success: status=ok,ok;init=1;execute=2;local=2;dispose=2;output=body|body;writer-end=0,0->1,1
+text/sync/error: status=same-error,ok;init=1;execute=2;local=2;dispose=1;output=|body;writer-end=0,0->1,1
+text/held/success: status=ok,ok;init=1;execute=2;local=2;dispose=2;output=body|body;writer-end=0,0->1,1
+text/held/error: status=same-error,ok;init=1;execute=2;local=2;dispose=1;output=|body;writer-end=0,0->1,1
+pipe/sync/success: status=ok,ok;init=1;execute=2;local=2;dispose=2;output=body|body;writer-end=0,0->1,1
+pipe/sync/error: status=same-error,ok;init=1;execute=2;local=2;dispose=1;output=|body;writer-end=0,0->1,1
+pipe/held/success: status=ok,ok;init=1;execute=2;local=2;dispose=2;output=body|body;writer-end=0,0->1,1
+pipe/held/error: status=same-error,ok;init=1;execute=2;local=2;dispose=1;output=|body;writer-end=0,0->1,1

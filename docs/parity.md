@@ -25,8 +25,17 @@ An implemented row is not blanket verification of its whole feature.
 | Optional, case-sensitive, repeated and whitespace section names; empty name rejected; partial bypasses all declared layouts | Verified, bounded | Same golden includes missing `page-only` (must not recurse), `Footer`, whitespace, repeated footer, bare partial and empty-name rejection. This covers ASCII literal output, not general encoder equivalence. |
 | Layout references/boxes, `Sectioned` associations/shadowing, explicit composition, original writer errors, lazy execution without flush | Implemented | `tests/nested_layout_sections.rs` plus existing `declared_layouts`, `layouts`, `sections` suites. Every byte-offset failure of the golden document is tested, retaining I/O kind/source and exact accepted prefix. These Rust-specific adapter/error contracts are not C# differential tests. |
 | Generated typed models, nested control flow, primitive/trusted/attribute values | Implemented | Runtime `inline`, `control_flow`, `async_templates`, `attributes` tests and runnable value examples; broader grammar/date/custom formatting and encoder configuration remain #3/#2. |
+| Generated async writer type does not shadow identifiers visible in the invocation | Implemented, Rust-specific | `compiler_hygiene` renders associated constants twice with exact escaped output; macro unit coverage includes nested/raw identifiers and generic names. Identifiers introduced by later nested macro expansion are outside this scan. No C# differential claim. |
+| Raw model field spelling and conditional-compilation validation | Implemented, Rust-specific | `compiler_raw_identifiers` checks owned/borrowed constructors and render-body compilation; macro unit tests accept `r#model`, reject wrong/multiple fields and retain the invocation-level `cfg`/`cfg_attr` guard for ordinary/raw spellings on structs/fields. This is compiler compatibility, not runtime/lifecycle equivalence. |
+| Render-local code blocks preserve bindings and semicolon-less unit expression tails | Implemented, Rust-specific | `compiler_code_blocks` renders exact escaped output twice, with zero construction effects and five effects per render, including nested/attributed/awaited tails. Four standalone doctests include positive binding scope and rejection of integer, `Result` and unawaited future tails. No C# differential or lifecycle equivalence claim. |
+| Text bridge discards completed/invalid pending UTF-8 after errors without panicking or replaying bytes on explicit cleanup writes | Implemented, Rust-specific | `render_lifecycle` covers every split of selected two/three/four-byte scalars, original formatting/UTF-8 error types, malformed pending sequences and repeated rendering. This repairs the inline #30 bridge's error state, not the C# encoder policy. |
+| Render-local resources drop after write/flush errors while model/layout captures and destinations remain owned by callers | Implemented, bounded | Four `render_lifecycle` tests include synchronous text/byte errors and nested generated async layout reuse after write/final-flush errors. Original I/O kind/source identity, accepted prefix, local/captured/destination drop counts and persistent application effects are checked. No cancellation/token acceptance is included. |
+| Two declared layouts retain output/error prefixes and clean up entered render-local resources on writer failure | Verified, bounded common subset | `layout_lifecycle` matches the twelve `common/` rows in `tests/parity/fixtures/layout-lifecycle.txt`. Both pinned C# TextWriter/PipeWriter paths match those rows, for immediate/held body execution, success and each of five ASCII write failures. Rust additionally checks owned/borrowed/boxed lifetimes and two healthy retries per case. The `csharp/` disposal rows are reference-only, not ownership equivalence. |
 | Optional body values: absent output, encoded string, nullable integer/float and trusted HTML | Verified, bounded | Twelve `optional-values` cases use both pinned C# PipeWriter/TextWriter paths and match `fixtures/optional-values.txt` in synchronous text/byte and generated async Rust paths. Rust `Option<T>` delegates `Some` and emits nothing for `None`. This does not establish broad encoder/culture/boolean formatting equivalence. |
 | Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
+| Character body/nullable/attribute output in the selected common ASCII subset | Verified, bounded | Fourteen `character-values` cases match actual pinned C# PipeWriter/TextWriter output and generated sync text/byte/async Rust paths via `fixtures/character-values.txt`. Character support is additive; broader Unicode/quote-policy equivalence is not claimed. |
+| Character UTF-8/string-encoding consistency, original failures, backpressure, cancellation/drop and byte thresholds | Implemented | Eight `character_values` regressions cover Unicode scalar boundaries, optional/reference attributes, every failure offset including partial UTF-8, final-flush errors, held writes and 16,383/16,384/16,385-byte native/fallback thresholds. Existing bool/float representations stay unchanged. |
+| Boolean/float/quote/Unicode reference behavior beyond the shared subset | Missing, reference characterized | Eighteen C#-only `primitive-outcomes` cases below expose direct/generic boolean path differences and default formatting/encoder policy. These are not Rust differential verification or permission to copy a reference defect/change Rust defaults. |
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
 | Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
 | Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags remain unrepresented under #74. |
@@ -35,8 +44,177 @@ An implemented row is not blanket verification of its whole feature.
 | Native flush-result flags versus faulted/cancelled operations | Missing, reference characterized | The C#-only `flush-outcomes` mode below records twelve reference cases. Native flags are not exposed by Rust; the TextWriter completion subset now has separate bounded differential evidence above. |
 | Typed request scope and cancellation; buffered/streaming HTTP | Implemented | `request_context` and Axum transport tests. Broader request/layout assembly #69, framework service injection, portable response-start and lifecycle equivalence remain unverified/missing under #47/#52/#11. |
 | Configurable .NET `HtmlEncoder`, broader Unicode/numeric/date formatting | Missing | Rust's five-character encoder and fixed primitive formatting are not byte-for-byte configurable C# policy parity. Requires dedicated differential cases and explicit compatibility decisions. |
-| C# initialization, pooling and disposal lifecycle | Missing | Rust borrows/re-executes reusable templates; it does not emulate C# instance disposal/pooling. #47/#11/#52 remain open scope. |
+| C# initialization, pooling and disposal lifecycle | Missing, reference characterized | Eight C#-only `render-lifecycle` cases measure initialization, local cleanup, `Dispose` override calls, destination ownership and explicit same-instance retry. The additional `layout-lifecycle` mode characterizes two-layout disposal cascades on success/writer errors; only its common output/local-cleanup subset is shared. Rust retains ordinary ownership. Pooling, throwing-disposal and framework/service lifetime equivalence remain unverified under #47/#11/#52. |
 | Razor files/`@section` syntax, async trait objects and local-only async futures | Unsupported | Current authoring is the accepted inline proc-macro mechanism, not Razor parsing. Upstream also avoids Razor `@section`; Rust sections are explicit providers. No additional authoring/API approval is implied. |
+
+## Rust compiler compatibility
+
+Compiler-only fixes are integrated alongside the character work, without
+changing the pinned C# reference or Rust runtime defaults. Their source patches
+are `c8107ded48af02f879a726a5c88b52b6cab6fa23` (writer-name hygiene) and
+`56b7d0609f9c3c7a7a0f1e2d5f60bf1dd0177b93` (raw-identifier validation), plus
+`7370e5ed641f22d207e3beab757eb6e8bfa7eca7` (unit code-block tails).
+They were reviewed against their common base
+`841bf9c585209cc3415d5fdd0e1224f133ccb852` and integrated over the character
+implementation. These are Rust-specific bugs, not cross-language comparisons.
+
+Before the fixes, the new tests fail against character head `5eb0c970`:
+`{__RazorWriter::TEXT}` produces `E0599` because the generated writer type
+parameter shadows the user's type, and `r#model` is rejected as though it were
+not the required `model` field. The corrected code scans visible invocation
+identifiers, including nested/raw names, and normalizes raw spellings during
+declaration validation. It retains the existing prohibition on inner
+conditional-compilation attributes rather than allowing raw spellings to
+bypass that guard.
+
+```sh
+cargo test --locked -p razor-slices-macros
+cargo test --locked -p razor-slices --test compiler_hygiene --test compiler_raw_identifiers --test compiler_code_blocks
+```
+
+The hygiene regression renders the same template twice and requires exact
+`&lt;first&gt;&amp;second&gt;third` output. The raw-field regression compiles both
+body spellings and owned/borrowed typed constructors; it does not execute a
+render. Three additional macro unit tests cover name selection, valid/invalid
+model declarations, and ordinary/raw struct/field conditional attributes.
+The name scan cannot observe identifiers introduced only by a later nested
+macro expansion. Broader grammar and parent-epic scope remain open.
+
+The code-block regression also fails against the earlier combined compiler head
+`7d0149ce`: a valid `@{ let label = "<local>"; model.touch() }` produces an
+unexpected generated `__razor_writer` token when its tail is flattened directly
+before the next template write. Wrapping only semicolon-less expressions as
+unit-valued block statements preserves preceding render-local bindings without
+silently discarding values. The regression renders `&lt;local&gt;done` twice,
+asserting zero effects at construction and effect counts of five and ten after
+the two renders. Its four doctests preserve rejection of integer, `Result`
+and unawaited future tails. This is Rust code-generation correctness, not new
+cross-language or cancellation/lifecycle parity.
+
+## Render lifecycle and error-state cleanup
+
+The live #11 discussion leaves initialization/disposal and writer lifecycle
+parity open. #47 covers section/layout context and error boundaries; #52
+separately covers HTTP peer disconnect, request cancellation and response start.
+None requires copying a managed pooling/disposal architecture into Rust.
+The existing inline #30 contract also includes split UTF-8 and writer errors.
+This increment addresses a demonstrated bridge error-state bug and records
+bounded ownership evidence; it does not complete any of those parent scopes.
+
+Before the bridge fix, an error forwarding a completed four-byte code point
+left `TextWriter.len == 4`. An explicitly handled error followed by a cleanup
+write indexed outside its four-byte array. Malformed pending UTF-8 could leave
+the same invalid state. Completed two/three-byte code points could instead
+leak into a later cleanup write. The bridge now clears completed/invalid state
+before returning the error, without changing error types, accepted output,
+validation of malformed input, or normal incomplete-code-point buffering.
+Generated rendering still stops at the first error. The regressions explicitly
+attempt cleanup inside handwritten code and then return the original error;
+there is no implicit retry, output rollback or error swallowing.
+
+Four Rust regressions in `tests/render_lifecycle.rs` cover every split of
+selected two/three/four-byte scalars, malformed pending sequences, repeated
+renders, and ordinary resource ownership. Synchronous closures and generated
+nested async layouts release render-local guards on write/final-flush errors,
+but retain owned model/layout captures until their owner is dropped. Borrowed
+destinations remain open. The same template can be rendered again; application
+effects persist and are not reset or rolled back. These are Rust contracts,
+not a new disposal callback API or cancellation acceptance.
+
+The new **C#-only** `render-lifecycle` mode executes eight cases against the
+unchanged pinned runtime: PipeWriter/TextWriter, synchronous/explicitly held
+execution, and success/write failure, each followed by a new-destination render
+of the same instance. It checks exception identity and records:
+
+- One initializer call, two executions and two render-local `using` disposals.
+- Two automatic `Dispose` override calls for two successful renders, but one
+  for a failed render followed by success. This counts override invocations,
+  not physical resource releases; a fault is not an automatic slice-disposal
+  guarantee in these paths.
+- No writer disposal/completion by rendering; each caller-owned writer ends
+  only when the harness explicitly disposes/completes it.
+
+Re-rendering the C# instance after a previous automatic `Dispose` is measured
+characterization, not a general upstream reuse guarantee. Rust deliberately
+retains reusable borrowed/owned templates and normal `Drop`, rather than
+emulating the reference's per-render calls or fault behavior. Pool reuse,
+layout disposal cascades, service scopes, HTTP ownership and cancellation
+remain separate acceptance. Any future managed-style lifecycle hook needs a
+specific use case and compatibility decision, not inference from this fixture.
+
+Using the pinned checkout described below:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- render-lifecycle > target/csharp-render-lifecycle.txt
+diff -u tests/parity/fixtures/render-lifecycle.txt target/csharp-render-lifecycle.txt
+cargo test --locked -p razor-slices --test render_lifecycle --test inline
+```
+
+The eight reference rows match both Debug and Release. They are not a shared
+Rust/C# lifecycle golden or new full initialization/pooling/disposal parity.
+No #69 request/layout cancellation tests, token contracts or fixtures change.
+
+### Layout/content disposal cascades
+
+The `layout-lifecycle` mode extends the same pinned source characterization to a
+page inside two declared layouts. Each write emits one ASCII byte, producing
+`OIPio`. Both TextWriter and PipeWriter execute immediate and explicitly held
+body paths, succeeding or failing before each of the five writes: 24 executions
+per build configuration. Failures before the body never enter its gate; later
+held cases are checked to be pending before the explicit release.
+
+The fixture contains two kinds of rows:
+
+- `common/`: exact output/accepted prefix, original destination error, counts of
+  entered render-local cleanup, and whether the body entered its gate. Both C#
+  destinations must agree before a row is emitted. Rust independently matches
+  these twelve rows using its incremental byte writer, not a simulated C#
+  disposal API or a claim about Rust synchronous text rendering.
+- `csharp/`: automatic and explicit `Dispose` override counts, followed by
+  idempotent **test-lease** state, each in page/inner/outer order. A snapshot such
+  as `2,2,1/1,1,1` means two page, two inner and one outer override calls, but one
+  first release of each instrumented test lease. These are not physical resource, pool-return or
+  production resource-release measurements.
+
+On success, automatic counts are `2,2,1`: a child is disposed after its own
+successful render, and a parent's first disposal calls its immediate content's
+`Dispose` again. `RazorSlice.DisposeInternal` guards its own recursive work with
+`_disposed`; it does not suppress an overriding method's entry. This follows
+`RazorSlice.cs`, `RazorSlice.Partials.cs`, `IUsesLayout.cs` and
+`RazorLayoutSliceOfTModel.cs` at the pinned source identity.
+
+Errors before either layout prefix or the body leave automatic counts at zero.
+Failure on the inner suffix leaves counts `1,0,0`; failure on the outer suffix
+leaves `2,1,0`. Explicitly disposing the original page does not traverse upward
+to layouts created for it. The harness retains the created outer layout through
+its proxy solely to measure explicit cleanup: disposing that outer instance
+reaches the remaining content chain and leaves each test lease released once.
+On already successful nodes, repeated override calls need not repeat the base
+class's guarded cascade. Both destinations remain caller-owned throughout.
+
+No distinct Rust runtime defect was reproduced. New acceptance tests pass
+against the unchanged runtime: the owned page and both layouts survive every
+attempt and two healthy retries, then drop once when their owner drops.
+Dropping borrowed declarations does not drop the original providers; dropping
+each provider does. Reference/box forwarding retains these lifetimes and the
+original I/O source. This intentional ownership difference is preserved, not
+"fixed" by adding disposal hooks, pooling or automatic owner destruction.
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- layout-lifecycle > target/csharp-layout-lifecycle.txt
+diff -u tests/parity/fixtures/layout-lifecycle.txt target/csharp-layout-lifecycle.txt
+cargo test --locked -p razor-slices --test layout_lifecycle
+```
+
+The complete reference fixture matches Debug and Release; only the `common/`
+rows have Rust differential acceptance. This small ASCII/write-error document
+does not cover large-output flush boundaries, throwing disposal, GC/physical
+resources, pooling, HTTP/service lifetime, or cancellation. The separate #69
+fixtures and token contracts are untouched. #11/#47/#52 remain incomplete.
 
 ## Reproduce the C# golden
 
@@ -266,3 +444,77 @@ cancellation/drop and bounded encoding/completion accounting. Two compile-fail
 doctests retain rejection of unsupported optional payload types.
 This is bounded nullable-value dispatch/output evidence, not full .NET encoder,
 culture/date/number/boolean formatting or instance-lifecycle equivalence.
+
+## Character values and primitive outcomes (#79)
+
+Before selecting the runtime change, the unchanged pinned C# runtime was
+executed on both PipeWriter and TextWriter destinations. It supports character
+body/nullable/attribute output, while both Rust generated body paths and
+`attribute(name, char)` failed with `E0277`. The implementation adds `char` to
+`WriteHtmlValue`, `AsyncWriteHtmlValue` and the existing attribute value adapters.
+A four-byte UTF-8 stack buffer feeds the existing string encoder; it does not
+allocate, add syntax, bypass encoding or flush implicitly. References and
+optional values retain their existing delegation/omission contracts.
+
+Reproduce the fourteen shared character cases:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- character-values > target/csharp-character-values.txt
+diff -u crates/razor-slices/tests/fixtures/character-values.txt target/csharp-character-values.txt
+cargo test --locked -p razor-slices --test character_values
+```
+
+The [value harness](../tests/parity/OptionalValueCases.cs) requires actual C#
+pipe/text output to agree for the shared cases: selected ASCII characters,
+ampersand/angle-bracket/double-quote escapes, nullable characters and scalar/
+optional character attributes. Rust compares generated sync text/byte and
+async output with the same [golden](../crates/razor-slices/tests/fixtures/character-values.txt).
+The subset is not all ASCII or full .NET encoder equivalence.
+
+Rust `char` is a Unicode scalar, not a UTF-16 code unit; isolated surrogates
+cannot be represented. UTF-8 boundaries, controls, supplementary characters and
+the maximum scalar are tested against the **existing Rust string encoder**,
+not asserted equivalent to .NET's broader default encoder. The old negative
+`char` compiler case is now `Vec<char>`: adding scalar support does not add
+implicit collection or `Display` conversion.
+
+Eight regressions additionally preserve original I/O kind/source and accepted
+prefix at every body/attribute failure byte, including partial four-byte UTF-8,
+skip suffix/final flush after failure, retain final-flush errors and held-write
+backpressure/cancellation/drop, and count encoded versus UTF-8 bytes exactly at
+16,383/16,384/16,385-byte completion boundaries with native/fallback accounting.
+
+### Reference-only primitive characterization
+
+The same source was characterized before choosing the additive character fix:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- primitive-outcomes > target/csharp-primitive-outcomes.txt
+diff -u tests/parity/fixtures/primitive-outcomes.txt target/csharp-primitive-outcomes.txt
+```
+
+These [eighteen C#-only cases](../tests/parity/fixtures/primitive-outcomes.txt)
+are **not** asserted by Rust CI as byte parity:
+
+- Direct `Write(bool?)` produces no boolean bytes on PipeWriter, but title-case
+  `True`/`False` on TextWriter. Generic `Write<T>(bool)` produces title-case
+  output on both. The pinned `PipeWriterHtmlExtensions.Write(bool)` formats
+  into a span without advancing it. Rust deliberately retains its existing
+  lowercase `true`/`false`; it does not emulate lost reference output.
+- Under invariant culture, C# infinities are `Infinity`/`-Infinity`, while Rust
+  retains `inf`/`-inf`. Both measured negative-zero cases render `-0`.
+  C# uses `1E-30` and encoded `1E&#x2B;30` for the selected magnitudes; Rust
+  retains its existing decimal `Display` representation.
+- C# single quote is `&#x27;`, where Rust strings/characters retain `&#39;`.
+  Both measured double-quote paths produce `&quot;`. C# encodes the selected
+  BMP/supplementary scalars as `&#x96EA;`/`&#x1F980;`; Rust retains its existing
+  UTF-8 text policy.
+
+Broader primitive/encoder compatibility therefore requires an explicit bounded
+policy decision and its own differential cases, not a blanket default-format
+change or copying the direct-boolean path discrepancy. This increment leaves
+all existing Rust representations and public APIs intact.

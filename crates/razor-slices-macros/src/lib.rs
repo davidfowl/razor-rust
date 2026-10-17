@@ -2,12 +2,16 @@
 //!
 //! Use the runtime's public macro, which supplies a hygienic runtime path even
 //! when the dependency is renamed.
+//! Generated async writer type names avoid identifiers in the macro input,
+//! including type paths inside nested template bodies.
 
 use proc_macro::TokenStream;
 use quote::quote;
+use std::collections::BTreeSet;
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    braced, parenthesized, Block, Expr, Fields, ItemStruct, LitStr, Pat, Result, Stmt, Token,
+    braced, ext::IdentExt, parenthesized, Block, Expr, Fields, ItemStruct, LitStr, Pat, Result,
+    Stmt, Token,
 };
 
 mod directive {
@@ -197,7 +201,14 @@ fn generate_parts(
             let body = generate_parts(body, runtime, writer, syntax);
             quote! { for #pattern in #iterator { #body } }
         }
-        Part::Code(statements) => quote! { #(#statements)* },
+        Part::Code(statements) => {
+            let statements = statements.into_iter().map(|statement| match statement {
+                // Preserve unit block semantics without hiding preceding bindings.
+                Stmt::Expr(expression, None) => quote! { { #expression } },
+                statement => quote! { #statement },
+            });
+            quote! { #(#statements)* }
+        }
         Part::Await { future, propagate } => {
             let question = propagate.then(|| quote! { ? });
             quote! { let (): () = (#future).await #question; }
@@ -235,6 +246,28 @@ struct AsyncTemplate {
     parts: Vec<Part>,
 }
 
+fn writer_type_name(input: proc_macro2::TokenStream) -> proc_macro2::Ident {
+    let mut identifiers = BTreeSet::new();
+    let mut pending = vec![input];
+    while let Some(tokens) = pending.pop() {
+        for token in tokens {
+            match token {
+                proc_macro2::TokenTree::Group(group) => pending.push(group.stream()),
+                proc_macro2::TokenTree::Ident(ident) => {
+                    let name = ident.to_string();
+                    identifiers.insert(name.strip_prefix("r#").unwrap_or(&name).to_owned());
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut name = String::from("__RazorWriter");
+    while identifiers.contains(&name) {
+        name.push('_');
+    }
+    proc_macro2::Ident::new(&name, proc_macro2::Span::mixed_site())
+}
+
 impl Parse for AsyncTemplate {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let runtime;
@@ -247,7 +280,7 @@ impl Parse for AsyncTemplate {
                     && fields.named[0]
                         .ident
                         .as_ref()
-                        .is_some_and(|name| name == "model") => {}
+                        .is_some_and(|name| name.unraw() == "model") => {}
             _ => {
                 return Err(syn::Error::new_spanned(
                     &declaration,
@@ -260,7 +293,10 @@ impl Parse for AsyncTemplate {
             .iter()
             .chain(declaration.fields.iter().flat_map(|field| &field.attrs))
         {
-            if attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr") {
+            if attribute.path().get_ident().is_some_and(|name| {
+                let name = name.unraw();
+                name == "cfg" || name == "cfg_attr"
+            }) {
                 return Err(syn::Error::new_spanned(
                     attribute,
                     "apply conditional compilation to the async_template! invocation",
@@ -283,6 +319,7 @@ impl Parse for AsyncTemplate {
 /// Implementation detail of the runtime's `async_template!` declaration macro.
 #[proc_macro]
 pub fn async_template(input: TokenStream) -> TokenStream {
+    let writer_type = writer_type_name(input.clone().into());
     let AsyncTemplate {
         runtime,
         declaration,
@@ -299,15 +336,6 @@ pub fn async_template(input: TokenStream) -> TokenStream {
     let model_type = &field.ty;
     let (impl_generics, type_generics, where_clause) = declaration.generics.split_for_impl();
     let writer = proc_macro2::Ident::new("__razor_writer", proc_macro2::Span::mixed_site());
-    let mut writer_type_name = String::from("__RazorWriter");
-    while declaration.generics.params.iter().any(|param| match param {
-        syn::GenericParam::Type(param) => param.ident == writer_type_name,
-        syn::GenericParam::Const(param) => param.ident == writer_type_name,
-        syn::GenericParam::Lifetime(_) => false,
-    }) {
-        writer_type_name.push('_');
-    }
-    let writer_type = proc_macro2::Ident::new(&writer_type_name, proc_macro2::Span::mixed_site());
     let writes = generate_parts(parts, &runtime, &writer, Syntax::Async);
     quote! {
         #declaration
@@ -336,6 +364,22 @@ pub fn async_template(input: TokenStream) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn writer_type_names_avoid_nested_and_raw_identifiers() {
+        assert_eq!(writer_type_name(quote! {}), "__RazorWriter");
+        assert_eq!(
+            writer_type_name(quote! {
+                struct Page<__RazorWriter> { model: __RazorWriter } => {
+                    if true {
+                        {__RazorWriter_::TEXT}
+                        for value in [r#__RazorWriter__::TEXT] { {value} }
+                    }
+                }
+            }),
+            "__RazorWriter___"
+        );
+    }
 
     #[test]
     fn parses_literals_and_expressions() {
@@ -429,5 +473,49 @@ mod tests {
             assert!(syn::parse_str::<AsyncTemplate>(input).is_err(), "{input}");
         }
         assert!(syn::parse_str::<Template>("(runtime) @flush;").is_err());
+    }
+
+    #[test]
+    fn raw_identifiers_preserve_model_field_validation() {
+        for input in [
+            "(runtime) struct Page { r#model: String } => { {model} {r#model} }",
+            "(runtime) struct Page<'a> { r#model: &'a str } => { {model} }",
+        ] {
+            assert!(syn::parse_str::<AsyncTemplate>(input).is_ok(), "{input}");
+        }
+        for input in [
+            "(runtime) struct Page { r#other: String } => {}",
+            "(runtime) struct Page { r#model: String, extra: String } => {}",
+        ] {
+            let error = syn::parse_str::<AsyncTemplate>(input).err().unwrap();
+            assert_eq!(
+                error.to_string(),
+                "expected a struct with exactly one named model field",
+                "{input}"
+            );
+        }
+    }
+
+    #[test]
+    fn raw_identifiers_preserve_conditional_compilation_validation() {
+        for input in [
+            "(runtime) #[cfg(any())] struct Page { model: String } => {}",
+            "(runtime) #[cfg_attr(all(), cfg(any()))] struct Page { model: String } => {}",
+            "(runtime) #[r#cfg(any())] struct Page { model: String } => {}",
+            "(runtime) #[r#cfg_attr(all(), cfg(any()))] struct Page { model: String } => {}",
+            "(runtime) struct Page { #[cfg(any())] model: String } => {}",
+            "(runtime) struct Page { #[cfg_attr(all(), cfg(any()))] model: String } => {}",
+            "(runtime) struct Page { #[r#cfg(any())] model: String } => {}",
+            "(runtime) struct Page { #[r#cfg_attr(all(), cfg(any()))] model: String } => {}",
+            "(runtime) struct Page { #[r#cfg(any())] r#model: String } => {}",
+            "(runtime) struct Page { #[r#cfg_attr(all(), cfg(any()))] r#model: String } => {}",
+        ] {
+            let error = syn::parse_str::<AsyncTemplate>(input).err().unwrap();
+            assert_eq!(
+                error.to_string(),
+                "apply conditional compilation to the async_template! invocation",
+                "{input}"
+            );
+        }
     }
 }

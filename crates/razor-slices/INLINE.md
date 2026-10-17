@@ -33,11 +33,18 @@ Literal content, including spaces, newlines and braces, is preserved exactly.
 Outside literals, whitespace only separates Rust tokens. Bare HTML is rejected.
 The macro does not validate HTML structure or infer attribute contexts.
 
-Each expression must implement `WriteHtmlValue`. Strings escape `& < > " '`;
+Each expression must implement `WriteHtmlValue`. Strings and characters escape `& < > " '`;
 numbers and booleans use the existing primitive formatting paths. `HtmlString`
 is an explicit trusted-HTML opt-out, never an automatic fallback for unsupported
 types. Do not wrap untrusted input in `HtmlString`. HTML escaping is not URL,
 JavaScript or CSS sanitization.
+
+Characters encode one Rust Unicode scalar through the same UTF-8 string path,
+using a four-byte stack buffer without allocation or implicit flushing.
+For example, `{'&'}` emits `&amp;`; references, optional characters and
+`attribute("data-char", '&')` use the same contracts. This does not emulate
+C# UTF-16 code units or change the existing string encoder's Unicode policy.
+See [the exact shared subset and remaining differences](../../docs/parity.md#character-values-and-primitive-outcomes-79).
 
 `Option<T>` is supported when `T: WriteHtmlValue`: `None` emits nothing and
 `Some` borrows/delegates to the value without cloning, adding delimiters or
@@ -63,8 +70,18 @@ The `fmt::Write` bridge decodes UTF-8 incrementally, including split code points
 without buffering the whole output. Invalid/incomplete UTF-8 and value/writer
 failures become `fmt::Error` on `Slice::render`, as required by that existing
 interface; convenience rendering wraps it in `RenderError`. Direct byte output
-does not validate custom value bytes. Writes stop at the first error; a failed
-render may leave partial output, but the template remains reusable.
+does not validate custom value bytes. Generated writes stop at the first error;
+a failed render may leave partial output, but the template remains reusable.
+If handwritten values explicitly attempt cleanup writes after an error, completed
+or invalid pending UTF-8 is not replayed into those writes. This is decoder-state
+cleanup, not an automatic retry or output rollback; custom implementations must
+still propagate their original errors.
+
+Ordinary Rust ownership controls resource cleanup. Render-local values are
+dropped when execution returns, including on error; captured model resources
+remain owned by the reusable template until its owner drops it. Rendering borrows
+the destination without closing it or consuming the template. See the
+[bounded lifecycle evidence](../../docs/parity.md#render-lifecycle-and-error-state-cleanup).
 
 The runtime's declarative entry point supplies a hygienic crate path to the
 proc macro, so renamed Cargo dependencies work without crate-name discovery.

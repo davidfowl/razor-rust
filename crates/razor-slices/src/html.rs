@@ -189,6 +189,8 @@ impl<const N: usize> fmt::Write for FixedBuf<N> {
 /// References and [`Option`] delegate without consuming the contained value.
 /// `None` writes nothing; `Some(value)` preserves that value's existing
 /// encoding/trust contract and original errors, without an implicit flush.
+/// Characters use a four-byte UTF-8 stack buffer and the existing string
+/// encoder, not raw markup or a separate Unicode/UTF-16 encoding policy.
 ///
 /// Optional values still require an explicitly supported contained type:
 ///
@@ -225,6 +227,13 @@ impl WriteHtmlValue for str {
 impl WriteHtmlValue for String {
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         encode_html_to_writer(self, writer)
+    }
+}
+
+impl WriteHtmlValue for char {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        let mut utf8 = [0; 4];
+        encode_html_to_writer(self.encode_utf8(&mut utf8), writer)
     }
 }
 

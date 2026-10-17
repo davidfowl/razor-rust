@@ -69,7 +69,7 @@ do not duplicate work already in progress.
 - Inline `html!` generates reusable slices with nested conditionals/loops.
   `async_template!` generates model-typed reusable `AsyncSlice` declarations
   with explicit await/flush, child and section directives. Typed async
-  interpolation supports the existing bool/numeric families, strings/references,
+  interpolation supports the existing bool/numeric families, characters, strings/references,
   trusted `HtmlString`, optional body values and conditional attribute adapters.
   `Option<T>` requires the contained value's explicit sync/async contract;
   `None` does no I/O and `Some` borrows/delegates without changing trust or flushing.

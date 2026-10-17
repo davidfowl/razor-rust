@@ -1,5 +1,29 @@
 using RazorSlices;
 
+if (args is ["layout-lifecycle"])
+{
+    await LayoutLifecycleCases.Run();
+    return;
+}
+
+if (args is ["render-lifecycle"])
+{
+    await LifecycleCases.Run();
+    return;
+}
+
+if (args is ["character-values"])
+{
+    await OptionalValueCases.RunCharacters();
+    return;
+}
+
+if (args is ["primitive-outcomes"])
+{
+    await OptionalValueCases.RunPrimitiveOutcomes();
+    return;
+}
+
 if (args is ["optional-values"])
 {
     await OptionalValueCases.Run();

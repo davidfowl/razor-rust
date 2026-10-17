@@ -29,7 +29,8 @@ let greeting = Greeting::new("<World>");
 ```
 
 The declaration is a Rust named-field struct with exactly one field named
-`model`. The generated `new(model)` constructor has the struct's visibility.
+`model` (the equivalent raw spelling `r#model` is also accepted).
+The generated `new(model)` constructor has the struct's visibility.
 The field's type is the constructor's type: it can own a model or borrow one
 with an explicit lifetime. Each render binds `model` to `&self.model`; it does
 not consume it. Ordinary lifetime/type parameters, where clauses, derives and
@@ -37,7 +38,8 @@ documentation attributes are supported. Supply `Sync` bounds for generic
 models, e.g. `struct Text<T: AsRef<str> + Sync> { model: T }`. Conditional
 compilation must wrap the whole macro invocation; `cfg`/`cfg_attr` on the
 inner struct/model field are rejected rather than leaving orphan generated
-implementations or conditionally removing the required model field.
+implementations or conditionally removing the required model field. This
+includes their raw spellings `r#cfg` and `r#cfg_attr`.
 
 Every body (including nested branches/loops) accepts:
 
@@ -60,8 +62,16 @@ For values, use `@{ let value = fetch(model).await?; }` followed by `{value}`,
 or `{fetch(model).await?}`. Normal Rust diagnostics still apply to code-block
 statements; the macro does not suppress must-use warnings.
 
+Code blocks keep preceding bindings available to later template parts.
+A semicolon-less tail such as `@{ let label = "<local>"; model.touch() }`
+is accepted when the final expression returns `()`, including an awaited
+unit-returning call. `{label}` can then emit the encoded local value.
+Non-unit integer, `Result` and unawaited future tails remain compile errors;
+the macro does not insert a semicolon that would silently discard them.
+Code executes during each render, not template construction.
+
 Interpolation uses the explicit `AsyncWriteHtmlValue` contract. Built-ins are
-`str`, `String`, references, `bool`, all Rust signed/unsigned integer families,
+`str`, `String`, `char`, references, `bool`, all Rust signed/unsigned integer families,
 `f32`/`f64`, trusted `HtmlString`, and validated `attribute(name, value)` adapters.
 `Option<T>` is also supported when `T` implements the explicit async contract:
 `None` performs no writes, and `Some` borrows/delegates to the existing value
@@ -85,7 +95,14 @@ inputs directly; the 6,144-byte encoded-write bound is not a maximum size for
 these raw writes. Scratch is independent of input length, not a bound on
 application-owned model memory, sink storage or custom implementation behavior.
 The original string-only `AsyncHtmlWriter::write_value` API remains intact.
-`char` is not currently a synchronous `WriteHtmlValue` type and is not added.
+`char` is supported on both paths: a four-byte UTF-8 stack buffer feeds the
+existing string encoder, preserving its five escapes, Unicode/control policy,
+awaited writes and byte accounting without allocation or implicit flush.
+References, optional values and character attributes delegate as usual.
+Rust `char` represents a Unicode scalar, not a C# UTF-16 code unit;
+collections do not silently become strings. The [shared character cases and
+primitive-outcome characterization](parity.md#character-values-and-primitive-outcomes-79)
+do not establish full .NET encoding or formatting equivalence.
 
 `attribute` keeps its existing validation and omission rules: true repeats the
 name, false/`None` omit the entire attribute, `Some` and references delegate,
@@ -109,6 +126,12 @@ missing directive delimiters and invalid declarations fail at compile time,
 never becoming silent text. The synchronous `html!` grammar/behavior is unchanged.
 The macro supplies its runtime path hygienically, including renamed dependencies
 and callers without the implicit prelude.
+Its generated writer type parameter avoids identifiers visible anywhere in
+the invocation, including raw identifiers and paths in nested bodies. This
+prevents a user type such as `__RazorWriter` from being shadowed by the generated
+parameter. Identifiers introduced only by a later nested macro expansion are
+not visible to this scan. These are Rust compiler compatibility guarantees,
+not additional C# runtime parity; see the [compiler evidence](parity.md#rust-compiler-compatibility).
 
 ## Runnable prefix-before-await fixture
 

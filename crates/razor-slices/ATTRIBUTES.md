@@ -2,8 +2,8 @@
 
 This bounded runtime adapter implements single-value, empty-prefix attributes,
 not new template grammar or the entire Razor attribute state machine.
-The original #43/#44 delivery notes below describe that milestone; the current
-#62/#63 async follow-up is cumulative over integration #61, not landed on main.
+The original #43/#44 and #62/#63 delivery notes describe those milestones;
+the current integration source includes both sync and async value contracts.
 
 ## Pinned upstream contract
 
@@ -24,10 +24,11 @@ Reference revision:
 ## Implementation boundaries
 
 The original #43/#44 adapter implements `WriteHtmlValue`; this integration
-source includes its inline macro consumers. The separate #62/#63 follow-up
-adds explicit async value contracts on frozen integration #61, retaining all
-unmerged source dependencies listed in [the integration guide](../../docs/integration.md).
-Synchronous behavior and name validation remain unchanged.
+source includes its inline macro consumers and the #62/#63 explicit async
+value contracts. Historical source dependencies are recorded in
+[the integration guide](../../docs/integration.md).
+Character support below is additive; existing value behavior and name
+validation remain unchanged.
 
 Attribute names use a conservative ASCII grammar, rejecting malformed
 names explicitly before any writing, even for an omitted value. This is a
@@ -44,7 +45,7 @@ formatting are not included. Values reuse the existing Rust writer contract.
 The name is borrowed; the value may be owned or borrowed. It does not allocate
 or buffer while rendering. The public `AttributeValue` trait supports custom
 values explicitly rather than silently formatting arbitrary `Display` types.
-Strings, `HtmlString`, all existing integer/float types, bool, `Option<V>` and
+Strings, characters, `HtmlString`, all existing integer/float types, bool, `Option<V>` and
 references (including `&dyn AttributeValue`) are supported.
 
 | Input | Output |
@@ -54,6 +55,7 @@ references (including `&dyn AttributeValue`) are supported.
 | `attribute("class", None::<&str>)` | nothing |
 | `attribute("class", Some(""))` | ` class=""` |
 | `attribute("title", "<&\"")` | ` title="&lt;&amp;&quot;"` |
+| `attribute("data-char", '&')` | ` data-char="&amp;"` |
 | `attribute("title", HtmlString::from("&lt;"))` | ` title="&lt;"` |
 
 `Some(false)` omits and `Some(true)` repeats the name too. Ordinary strings
@@ -61,6 +63,10 @@ containing `&lt;` emit `&amp;lt;`: they have not been marked trusted. Attribute
 names preserve spelling/case; true is conditional for any accepted name,
 not just names classified as HTML boolean attributes. A literal string
 `"false"` is retained, unlike the bool `false`.
+Characters use the existing string encoder, including its Unicode/control
+policy, via a four-byte UTF-8 stack buffer; `None::<char>` omits the attribute
+and `Some(char)` delegates. There is no implicit `Display`/collection conversion.
+See [bounded C# character evidence](../../docs/parity.md#character-values-and-primitive-outcomes-79).
 
 Names match `[A-Za-z_:][A-Za-z0-9_:.-]*`. Invalid names return a structured
 error with the first byte offset (or `None` for empty names). No output is

@@ -84,10 +84,12 @@ impl io::Write for TextWriter<'_> {
             bytes = &bytes[1..];
             match std::str::from_utf8(&self.pending[..self.len]) {
                 Ok(text) => {
-                    self.writer.write_str(text).map_err(io::Error::other)?;
+                    // Do not replay a completed code point if the sink rejects it.
                     self.len = 0;
+                    self.writer.write_str(text).map_err(io::Error::other)?;
                 }
                 Err(error) if error.error_len().is_some() => {
+                    self.len = 0;
                     return Err(io::Error::new(io::ErrorKind::InvalidData, error));
                 }
                 Err(_) => {}
