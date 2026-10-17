@@ -18,6 +18,67 @@ static class NativeSinkCases
         await Case("fallback-partial-failure", false, Threshold - 1, "xy", partialFailure: true);
     }
 
+    public static async Task RunFlushOutcomes()
+    {
+        foreach (var held in new[] { false, true })
+        {
+            foreach (var (name, canceled, completed) in new[]
+            {
+                ("normal", false, false),
+                ("canceled-flag", true, false),
+                ("completed-flag", false, true),
+                ("both-flags", true, true)
+            })
+            {
+                var writer = new CountingPipeWriter(true, Threshold, false)
+                {
+                    Result = new FlushResult(canceled, completed),
+                    HeldFlush = held ? new(TaskCreationOptions.RunContinuationsAsynchronously) : null
+                };
+                var render = new Text("").RenderAsync(writer);
+                if (held)
+                {
+                    if (render.IsCompleted)
+                        throw new InvalidOperationException("A held flush must block completion.");
+                    writer.HeldFlush!.SetResult(writer.Result);
+                }
+                await render;
+                Console.WriteLine($"{(held ? "held" : "ready")}-{name}: render=success,flushes={string.Join(",", writer.Flushes)}");
+            }
+        }
+
+        var failure = new IOException("original flush failure");
+        var failed = new CountingPipeWriter(true, Threshold, false) { Failure = failure };
+        try
+        {
+            await new Text("").RenderAsync(failed);
+            throw new InvalidOperationException("A faulted native flush must fail rendering.");
+        }
+        catch (IOException error) when (ReferenceEquals(error, failure))
+        {
+            Console.WriteLine("faulted-flush: original-error");
+        }
+
+        var canceledWriter = new CountingPipeWriter(true, Threshold, false) { CancelFlush = true };
+        try
+        {
+            await new Text("").RenderAsync(canceledWriter);
+            throw new InvalidOperationException("A canceled native flush must cancel rendering.");
+        }
+        catch (OperationCanceledException error) when (error.CancellationToken.IsCancellationRequested)
+        {
+            Console.WriteLine("canceled-flush: cancellation-error");
+        }
+
+        using var text = new CountingTextWriter();
+        await new Text(new string('x', Threshold)).RenderAsync(text);
+        if (text.GetStringBuilder().Length != Threshold || text.Flushes != 0)
+            throw new InvalidOperationException("TextWriter must not auto-flush at the pipe threshold.");
+        Console.WriteLine($"textwriter-threshold: flushes={text.Flushes}");
+        await new ExplicitTextFlush().RenderAsync(text);
+        Console.WriteLine($"textwriter-explicit: flushes={text.Flushes}");
+    }
+
     private static async Task Case(
         string name, bool native, int prefilled, string text,
         bool drain = false, bool partialFailure = false)
@@ -55,6 +116,21 @@ static class NativeSinkCases
         }
     }
 
+    private sealed class ExplicitTextFlush : RazorSlice
+    {
+        public override async Task ExecuteAsync() => await FlushAsync();
+    }
+
+    private sealed class CountingTextWriter : StringWriter
+    {
+        public int Flushes { get; private set; }
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            Flushes++;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class CountingPipeWriter : PipeWriter
     {
         private readonly ArrayBufferWriter<byte> _buffer = new();
@@ -75,6 +151,10 @@ static class NativeSinkCases
 
         public int Pending { get; private set; }
         public bool FailNextAdvance { get; set; }
+        public FlushResult Result { get; set; } = new(isCanceled: false, isCompleted: false);
+        public TaskCompletionSource<FlushResult>? HeldFlush { get; set; }
+        public Exception? Failure { get; set; }
+        public bool CancelFlush { get; set; }
         public List<int> Flushes { get; } = [];
         public override bool CanGetUnflushedBytes => _native;
         public override long UnflushedBytes => _native ? Pending : throw new NotSupportedException();
@@ -103,7 +183,11 @@ static class NativeSinkCases
             Flushes.Add(Pending);
             Pending = 0;
             _buffer.Clear();
-            return ValueTask.FromResult(new FlushResult(isCanceled: false, isCompleted: false));
+            if (Failure is not null)
+                return ValueTask.FromException<FlushResult>(Failure);
+            if (CancelFlush)
+                return ValueTask.FromCanceled<FlushResult>(new CancellationToken(canceled: true));
+            return HeldFlush is null ? ValueTask.FromResult(Result) : new(HeldFlush.Task);
         }
     }
 }

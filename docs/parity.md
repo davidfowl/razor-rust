@@ -28,6 +28,7 @@ An implemented row is not blanket verification of its whole feature.
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
 | Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
 | Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags and TextWriter policy remain missing under #74. |
+| Native flush-result flags versus faulted/cancelled operations; TextWriter auto-flush policy | Missing, reference characterized | The C#-only `flush-outcomes` mode below records twelve reference cases. These are acceptance inputs for a follow-up, not Rust differential verification or a new runtime capability. |
 | Typed request scope and cancellation; buffered/streaming HTTP | Implemented | `request_context` and Axum transport tests. Broader request/layout assembly #69, framework service injection, portable response-start and lifecycle equivalence remain unverified/missing under #47/#52/#11. |
 | Configurable .NET `HtmlEncoder`, broader Unicode/numeric/date formatting | Missing | Rust's five-character encoder and fixed primitive formatting are not byte-for-byte configurable C# policy parity. Requires dedicated differential cases and explicit compatibility decisions. |
 | C# initialization, pooling and disposal lifecycle | Missing | Rust borrows/re-executes reusable templates; it does not emulate C# instance disposal/pooling. #47/#11/#52 remain open scope. |
@@ -84,8 +85,8 @@ layouts but preserves explicit compositions. Associations outside an already
 declared page affect that page's consumers, not its original inner context.
 This is a reversible Rust adapter choice, not a claim of accepted new syntax.
 
-Next bounded increment: source-pin executable cases for #74's native flush
-outcomes and TextWriter policy before extending sink capabilities further.
+Next bounded increment: choose a bounded sink-policy mapping for the reference
+cases below, preserving the distinction between result flags and failed operations.
 Do not count #66, passing tests, or this matrix as completion of any parent epic.
 
 ## Native byte accounting (#74)
@@ -142,3 +143,35 @@ Default fallback cannot discover bytes the trait implementation does not report.
 completion flags, and the byte sink still maps to pipe-like rather than
 TextWriter-specific automatic-flush policy. Keep #74/#11/#52 open for that
 remaining scope; the whole runtime is not at verified C# parity.
+
+### Remaining flush outcomes and TextWriter policy
+
+The same unchanged C# runtime is executable in `flush-outcomes` mode:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- flush-outcomes > target/csharp-flush-outcomes.txt
+diff -u tests/parity/fixtures/flush-outcomes.txt target/csharp-flush-outcomes.txt
+```
+
+The [C#-only reference golden](../tests/parity/fixtures/flush-outcomes.txt)
+characterizes twelve cases; it is **not** asserted by Rust CI or evidence that
+Rust exposes native result flags:
+
+- Both ready and held auto-flush operations complete rendering successfully
+  for all four `FlushResult.IsCanceled`/`IsCompleted` combinations. The pinned
+  renderer awaits completion but does not inspect these flags. A held flush
+  still blocks render completion until released.
+- A faulted flush preserves its original exception; an actually cancelled
+  flush operation propagates cancellation. A nonfaulted result's canceled
+  **flag** is therefore not equivalent to a cancelled operation.
+- A `TextWriter` receiving 16,384 literal characters does not auto-flush;
+  an explicit template flush invokes it once.
+
+Do not invent a native-flag error policy from names alone or collapse actual
+fault/cancellation into success. The current Rust sink has only
+`flush -> io::Result<()>`, maps destinations to the existing pipe-like
+completion policy, and cannot express a distinct TextWriter policy. Those
+capabilities remain unimplemented; a follow-up must compare observable render
+outcomes and explicit/final flushing before claiming parity.

@@ -6,6 +6,12 @@ if (args is ["native-accounting"])
     return;
 }
 
+if (args is ["flush-outcomes"])
+{
+    await NativeSinkCases.RunFlushOutcomes();
+    return;
+}
+
 using var document = new StringWriter();
 await new Page().RenderAsync(document);
 Console.WriteLine($"document: {document}");
