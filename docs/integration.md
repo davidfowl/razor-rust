@@ -63,8 +63,10 @@ incremental async APIs. Wrapper integration retains all text/byte overrides
 and the newer child/section dispatch paths.
 
 The consolidation retains both cancellation and unflushed-byte state on the
-shared writer. Only successful cancellable writes count toward the threshold;
-requested flushes reset accounting before awaiting the cancellable destination.
+shared writer. The default fallback counts only successful cancellable writes;
+requested flushes reset that fallback before awaiting the cancellable destination.
+Opt-in [native byte snapshots](parity.md#native-byte-accounting-74) instead use
+the sink-owned count, including prebuffered/partially accepted output.
 Both sets of samples, fixtures and HTTP regressions remain in CI. ADR
 reconciliation preserves the accepted option A and historical option B
 recommendation without reverting the implemented preview to scaffolding.
@@ -196,6 +198,6 @@ lifecycle in #47. The #61 source heads above remain frozen. Bounded typed reques
 models and cooperative cancellation are documented in
 [request-context.md](request-context.md); automatic completed-slice threshold
 flush is also included. Automatic request metadata/service injection, portable
-explicit response-start, native-pipe lifecycle/accounting and broader encoder policy
+explicit response-start, native-pipe lifecycle/flush-result flags and broader encoder policy
 remain #52/#11. Proxy/HTTP2 behavior and complete .NET parity are not inferred
 from local HTTP/1 tests. Broader benchmark parity remains #8.

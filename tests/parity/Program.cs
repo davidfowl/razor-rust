@@ -1,5 +1,11 @@
 using RazorSlices;
 
+if (args is ["native-accounting"])
+{
+    await NativeSinkCases.Run();
+    return;
+}
+
 using var document = new StringWriter();
 await new Page().RenderAsync(document);
 Console.WriteLine($"document: {document}");

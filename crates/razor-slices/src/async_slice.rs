@@ -65,6 +65,23 @@ pub trait AsyncSliceWriter {
     /// [`AsyncHtmlWriter::flush`]; generated [`crate::async_template!`] bodies
     /// can use the explicit `@flush;` directive.
     fn flush(&mut self) -> impl std::future::Future<Output = io::Result<()>> + Send;
+
+    /// Returns the sink's native count of accepted, unflushed output bytes.
+    ///
+    /// `Some(count)` is authoritative at successful slice/layout completion,
+    /// including bytes buffered before rendering or accepted by a write that
+    /// subsequently failed or was cancelled. A sink that drains during writes
+    /// may report zero. This must be an accurate current count, not a lifetime
+    /// total, capacity, estimate or count of input characters.
+    ///
+    /// The default `None` retains the renderer's existing fallback: successful
+    /// writes through one [`AsyncHtmlWriter`] borrow accumulate until a flush
+    /// is requested, including a pending/failed flush. It cannot see prebuffered
+    /// or partially accepted failing writes. This does not add per-write flushes,
+    /// expose native flush-result flags, or change explicit/final flushing.
+    fn unflushed_bytes(&self) -> Option<usize> {
+        None
+    }
 }
 
 /// An error that occurred while rendering a slice asynchronously.

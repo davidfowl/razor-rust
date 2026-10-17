@@ -1,0 +1,8 @@
+native-prefilled-plus-one: flushes=16384
+native-prefilled-empty: flushes=16384
+native-below-threshold: flushes=none
+fallback-prefilled-plus-one: flushes=none
+native-draining: flushes=none
+fallback-draining: flushes=0
+native-partial-failure: flushes=16384
+fallback-partial-failure: flushes=none

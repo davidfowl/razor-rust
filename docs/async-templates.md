@@ -216,6 +216,6 @@ has [bounded differential coverage](parity.md) for #66, while broader lifecycle
 remains #47. Explicit sections use
 [async-sections.md](async-sections.md). Framework response lifecycle stays
 [#52](https://github.com/davidfowl/razor-rust/issues/52)/[#56](https://github.com/davidfowl/razor-rust/issues/56).
-Cancellation tokens, native pipe accounting/flags, local-only writers and async trait
+Broader cancellation, native pipe flush-result flags, local-only writers and async trait
 objects remain #11. Historical ADR reconciliation stays #28/PR #29.
 No epic or whole-port landing is claimed.

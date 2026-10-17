@@ -144,6 +144,6 @@ do check the inclusive 16,384-byte threshold in this consolidated source.
   claim the entire #69 acceptance scope.
 - #52 retains automatic HTTP request metadata/service association and portable
   response start; generic request data is explicit in this milestone.
-- #11 retains native writer completion/accounting flags, disposal/initialization
+- #11 retains native writer completion/cancellation flags, TextWriter policy, disposal/initialization
   lifecycle and broader encoder policy. The synchronous buffered bridge is
   unchanged and has no new cancellation API.

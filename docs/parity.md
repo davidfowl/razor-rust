@@ -7,7 +7,7 @@ The reference is **DamianEdwards/RazorSlices at
 with `VersionPrefix` **0.12.1** in `src/Directory.Build.props`.
 This is an exact source pin, not a claim that a NuGet release or moving `main`
 was tested. It is the same reference used by the existing layout, async,
-request-context docs and issue #66.
+request-context docs and issues #66/#74.
 
 For each behavior, parity requires an observable contract: exact output,
 dispatch/order, failure behavior, or a measured streaming boundary. Matching
@@ -26,7 +26,8 @@ An implemented row is not blanket verification of its whole feature.
 | Layout references/boxes, `Sectioned` associations/shadowing, explicit composition, original writer errors, lazy execution without flush | Implemented | `tests/nested_layout_sections.rs` plus existing `declared_layouts`, `layouts`, `sections` suites. Every byte-offset failure of the golden document is tested, retaining I/O kind/source and exact accepted prefix. These Rust-specific adapter/error contracts are not C# differential tests. |
 | Generated typed models, nested control flow, primitive/trusted/attribute values | Implemented | Runtime `inline`, `control_flow`, `async_templates`, `attributes` tests and runnable value examples; broader grammar/date/custom formatting and encoder configuration remain #3/#2. |
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
-| Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). Native prebuffered/partially accepted bytes and flush-result fidelity remain missing in #74. |
+| Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
+| Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags and TextWriter policy remain missing under #74. |
 | Typed request scope and cancellation; buffered/streaming HTTP | Implemented | `request_context` and Axum transport tests. Broader request/layout assembly #69, framework service injection, portable response-start and lifecycle equivalence remain unverified/missing under #47/#52/#11. |
 | Configurable .NET `HtmlEncoder`, broader Unicode/numeric/date formatting | Missing | Rust's five-character encoder and fixed primitive formatting are not byte-for-byte configurable C# policy parity. Requires dedicated differential cases and explicit compatibility decisions. |
 | C# initialization, pooling and disposal lifecycle | Missing | Rust borrows/re-executes reusable templates; it does not emulate C# instance disposal/pooling. #47/#11/#52 remain open scope. |
@@ -42,7 +43,9 @@ dispatch, restore a floating package or build the Razor source generator.
 Handwritten C# slices/proxies exercise the real runtime's layout discovery,
 `ContentSlice`, `RenderBodyAsync`, `RenderSectionAsync` and partial bypass.
 This tests runtime behavior, not Razor code generation, package build metadata,
-HTTP or pipe flushing.
+HTTP, actual network delivery or package/source-generator builds. The
+`native-accounting` mode additionally exercises real upstream auto-flush
+selection against an instrumented `PipeWriter`, not a real transport.
 
 From the repository root, using an unused reference checkout path:
 
@@ -81,6 +84,55 @@ layouts but preserves explicit compositions. Associations outside an already
 declared page affect that page's consumers, not its original inner context.
 This is a reversible Rust adapter choice, not a claim of accepted new syntax.
 
-Next bounded increment: source-pin executable cases for #74's native pending-byte
-accounting and flush outcomes before designing optional sink capabilities.
+Next bounded increment: source-pin executable cases for #74's native flush
+outcomes and TextWriter policy before extending sink capabilities further.
 Do not count #66, passing tests, or this matrix as completion of any parent epic.
+
+## Native byte accounting (#74)
+
+Pinned `FlushTrackingPipeWriter.Create` returns a destination unchanged when
+`CanGetUnflushedBytes` is true. That native `UnflushedBytes` includes output
+buffered before rendering; `RazorSlice.AutoFlush` checks it after successful
+execution. Without the capability, the upstream wrapper starts at zero, counts
+successful `Advance` calls, and resets when flush is requested.
+
+`AsyncSliceWriter::unflushed_bytes() -> Option<usize>` supplies the analogous
+optional snapshot. The default `None` preserves existing implementations;
+`Some(count)` is the sink's authoritative current accepted/unflushed byte count,
+not capacity or a lifetime total. In particular, `Some(0)` must not fall back
+to successful-write accounting. A native count survives fresh output borrows
+and partial acceptance before a write error/cancellation. The runtime only
+queries it at existing successful child/layout completion boundaries.
+No mandatory runtime/dependency, per-write flush, counter adapter for arbitrary
+Tokio writers, implicit error recovery or new final-flush policy is added.
+This is a reversible optional Rust capability, not claimed maintainer API acceptance.
+
+Reproduce the eight C# cases after the reference checkout above:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- native-accounting > target/csharp-native-byte-accounting.txt
+diff -u crates/razor-slices/tests/fixtures/native-byte-accounting.txt \
+  target/csharp-native-byte-accounting.txt
+cargo test --locked -p razor-slices --test native_byte_accounting --test automatic_flush
+```
+
+The [C# cases](../tests/parity/NativeSinkCases.cs) call the unchanged upstream
+runtime with an instrumented native/non-native `PipeWriter`. They compare exact
+flush counts at the threshold, empty-slice completion with prebuffered output,
+a below-threshold snapshot, already-draining sinks, and native/fallback state
+after a partially accepted failed write followed by a separate successful render.
+The [golden](../crates/razor-slices/tests/fixtures/native-byte-accounting.txt)
+also checks that failed execution itself does not auto-flush.
+Rust-specific regressions additionally cover original errors, pending/failed/
+dropped native flushes, cancellation after partial acceptance, generated children,
+layouts, section-owned children, explicit/final flushes and reborrowed output.
+
+These cases do not equate .NET `PipeWriter.Advance` with every possible Rust
+`write_all` implementation. A native provider must supply a truthful snapshot.
+Default fallback cannot discover bytes the trait implementation does not report.
+`flush -> io::Result<()>` still does not expose native `FlushResult` cancellation/
+completion flags, and the byte sink still maps to pipe-like rather than
+TextWriter-specific automatic-flush policy. Keep #74/#11/#52 open for that
+remaining scope; the whole runtime is not at verified C# parity.

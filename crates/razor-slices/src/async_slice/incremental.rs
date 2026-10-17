@@ -236,7 +236,9 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
     /// At successful slice completion, at least 16,384 accepted output bytes
     /// since the last flush trigger an awaited flush. This is an inclusive byte
     /// threshold, not a per-write or arbitrary-await trigger. Counts are shared
-    /// across children, encoded values and layouts on this output.
+    /// across children, encoded values and layouts on this output. A sink's
+    /// native [`AsyncSliceWriter::unflushed_bytes`] count takes precedence over
+    /// the fallback count of successful writes through this output borrow.
     pub async fn write_slice(
         &mut self,
         slice: &(impl AsyncSlice + ?Sized),
@@ -249,7 +251,10 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
     }
 
     pub(super) fn should_auto_flush(&self) -> bool {
-        self.unflushed_bytes >= 16 * 1_024
+        self.writer
+            .unflushed_bytes()
+            .unwrap_or(self.unflushed_bytes)
+            >= 16 * 1_024
     }
 
     /// Executes a named section without adding a dispatch-level auto-flush.
@@ -296,8 +301,9 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
 /// destination remains caller-owned and is not shut down. Completed children
 /// and layouts check the 16,384-byte auto-flush threshold; writes and plain
 /// section dispatch do not. C# `PipeWriter` completion/cancellation flags are
-/// not provided. Accounting starts at zero for each new output borrow and
-/// counts only successful writes through it, not preexisting sink buffers.
+/// not provided. Native [`AsyncSliceWriter::unflushed_bytes`] snapshots include
+/// preexisting sink buffers; the default fallback starts at zero for each new
+/// output borrow and counts only successful writes through it.
 pub async fn render_incremental(
     slice: &(impl AsyncSlice + ?Sized),
     writer: &mut (impl AsyncSliceWriter + Send),

@@ -70,30 +70,41 @@ flush is requested. The upstream lifecycle benchmark's `AutoFlushSlice` writes
 
 The reversible Rust mapping uses the existing byte-oriented `AsyncSliceWriter`
 as the pipe-like sink, without a new runtime, configurable policy or C# API
-redesign. `AsyncHtmlWriter` counts bytes from successful writes through this
-borrow, after UTF-8 encoding/escaping/formatting. Generated `@render`, handwritten
+redesign. `AsyncHtmlWriter` uses an opt-in native
+`AsyncSliceWriter::unflushed_bytes()` snapshot when available, otherwise counting
+bytes from successful writes through this borrow after UTF-8 encoding/escaping/formatting.
+Generated `@render`, handwritten
 `write_slice`, supplied layout bodies and completed layout wrappers check the
-inclusive threshold on the shared counter. Literal/value/attribute writes and
+inclusive threshold on the current native count or shared fallback counter. Literal/value/attribute writes and
 plain `write_section` dispatch do not. An explicit section association renders
 its separate content slice as a child, so that child has a boundary.
 Raw `render_into`/`render_body_into` are execution hooks; handwritten partial
 calls should use `write_slice` to request the lifecycle boundary.
 
-Explicit and automatic flushes reset accounting when requested, including
-pending/failed flushes. Original errors stop execution; there is no final flush
+Explicit and automatic flushes reset fallback accounting when requested, including
+pending/failed flushes. Native counters remain owned by the sink; completion
+checks query its current snapshot, even after a failed or dropped flush.
+Original errors stop execution; there is no final flush
 after failure. Pending flush prevents later template code. Dropping a pending
 render stops polling it without rollback or independently spawned cancellation.
 The existing root `render_incremental` still final-flushes unconditionally on
 success, including below threshold; the synchronous buffered bridge is unchanged.
 No slice disposal or destination completion is added.
 
-Accounting starts at zero on each new `AsyncHtmlWriter` borrow: bytes already
-buffered by the caller, partial acceptance by a failing `write_all`, or writes
-outside this output are not inspectable through the existing sink trait. A
-saturating count preserves the threshold for arbitrarily large successful output.
+The default `unflushed_bytes() -> None` retains existing behavior: fallback
+accounting starts at zero on each new `AsyncHtmlWriter` borrow and cannot inspect
+caller-prebuffered bytes or partial acceptance by failing/cancelled writes.
+A saturating count preserves the threshold for arbitrarily large successful output.
+An opt-in `Some(count)` is authoritative, including `Some(0)` for a sink that
+already drained its writes; it is not added to the fallback. Native accounting
+therefore spans output borrows and includes accepted prefixes even when a write
+failed. It does not turn failed/cancelled execution into a successful flush
+boundary, retry the failed operation, or make restart atomic.
 The sink may expose bytes earlier than flush (Axum does); flush is not a network
-receipt guarantee. Native PipeWriter counters/flags and TextWriter discrimination
-are not claimed.
+receipt guarantee. See [the exact C# comparison and native capability contract](parity.md#native-byte-accounting-74).
+Native flush-result flags and TextWriter discrimination remain outside this
+bounded capability. Tokio/Axum adapters retain `None`; no portable native
+counter is inferred from an arbitrary `AsyncWrite` destination.
 
 ```sh
 cargo run --locked -p razor-slices --example automatic_flush --features tokio
