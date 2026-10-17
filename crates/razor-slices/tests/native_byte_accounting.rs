@@ -1,5 +1,5 @@
 use razor_slices::{
-    async_template, declare_async_layout, html, render_async, render_incremental,
+    async_template, attribute, declare_async_layout, html, render_async, render_incremental,
     with_async_section, AsyncHtmlWriter, AsyncLayout, AsyncRenderError, AsyncSlice,
     AsyncSliceWriter, CancellationToken, RenderCancelled,
 };
@@ -484,4 +484,31 @@ async fn native_bufwriter_flushes_prebuffered_prefix_before_later_application_wo
     let (result, ()) = tokio::join!(render, receive);
     result.unwrap();
     assert!(model.later_completed.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn native_threshold_uses_encoded_utf8_attribute_and_primitive_output_bytes() {
+    async_template! {
+        struct Mixed<'a> { model: &'a str } => {
+            {model} {42_u32} {attribute("title", "<&").unwrap()}
+        }
+    }
+    let suffix = "\u{96ea}&amp;42 title=\"&lt;&amp;\"";
+    for total in [THRESHOLD - 1, THRESHOLD, THRESHOLD + 1] {
+        let (mut writer, state) = writer(true, total - suffix.len());
+        AsyncHtmlWriter::new(&mut writer)
+            .write_slice(&Mixed::new("\u{96ea}&"))
+            .await
+            .unwrap();
+        let state = state.lock().unwrap();
+        assert_eq!(
+            state.flushes,
+            if total >= THRESHOLD {
+                vec![total]
+            } else {
+                vec![]
+            }
+        );
+        assert_eq!(state.native_reads, 1);
+    }
 }

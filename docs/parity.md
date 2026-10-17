@@ -135,6 +135,9 @@ must receive the entire threshold-sized prefix before releasing later template
 work; without the native completion flush this handshake cannot complete.
 Its buffer capacity exceeds the prefix, preventing an incidental capacity flush
 from satisfying the test. This is bounded buffered-I/O evidence, not TCP delivery.
+Boundary regressions also combine prebuffered bytes with generated escaped UTF-8,
+numeric and conditional-attribute output at 16,383/16,384/16,385 bytes, checking
+that the native count is queried once at completion rather than per value.
 
 These cases do not equate .NET `PipeWriter.Advance` with every possible Rust
 `write_all` implementation. A native provider must supply a truthful snapshot.
