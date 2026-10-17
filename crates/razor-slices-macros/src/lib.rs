@@ -2,9 +2,12 @@
 //!
 //! Use the runtime's public macro, which supplies a hygienic runtime path even
 //! when the dependency is renamed.
+//! Generated async writer type names avoid identifiers in the macro input,
+//! including type paths inside nested template bodies.
 
 use proc_macro::TokenStream;
 use quote::quote;
+use std::collections::BTreeSet;
 use syn::parse::{Parse, ParseStream};
 use syn::{
     braced, parenthesized, Block, Expr, Fields, ItemStruct, LitStr, Pat, Result, Stmt, Token,
@@ -235,6 +238,28 @@ struct AsyncTemplate {
     parts: Vec<Part>,
 }
 
+fn writer_type_name(input: proc_macro2::TokenStream) -> proc_macro2::Ident {
+    let mut identifiers = BTreeSet::new();
+    let mut pending = vec![input];
+    while let Some(tokens) = pending.pop() {
+        for token in tokens {
+            match token {
+                proc_macro2::TokenTree::Group(group) => pending.push(group.stream()),
+                proc_macro2::TokenTree::Ident(ident) => {
+                    let name = ident.to_string();
+                    identifiers.insert(name.strip_prefix("r#").unwrap_or(&name).to_owned());
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut name = String::from("__RazorWriter");
+    while identifiers.contains(&name) {
+        name.push('_');
+    }
+    proc_macro2::Ident::new(&name, proc_macro2::Span::mixed_site())
+}
+
 impl Parse for AsyncTemplate {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let runtime;
@@ -283,6 +308,7 @@ impl Parse for AsyncTemplate {
 /// Implementation detail of the runtime's `async_template!` declaration macro.
 #[proc_macro]
 pub fn async_template(input: TokenStream) -> TokenStream {
+    let writer_type = writer_type_name(input.clone().into());
     let AsyncTemplate {
         runtime,
         declaration,
@@ -299,15 +325,6 @@ pub fn async_template(input: TokenStream) -> TokenStream {
     let model_type = &field.ty;
     let (impl_generics, type_generics, where_clause) = declaration.generics.split_for_impl();
     let writer = proc_macro2::Ident::new("__razor_writer", proc_macro2::Span::mixed_site());
-    let mut writer_type_name = String::from("__RazorWriter");
-    while declaration.generics.params.iter().any(|param| match param {
-        syn::GenericParam::Type(param) => param.ident == writer_type_name,
-        syn::GenericParam::Const(param) => param.ident == writer_type_name,
-        syn::GenericParam::Lifetime(_) => false,
-    }) {
-        writer_type_name.push('_');
-    }
-    let writer_type = proc_macro2::Ident::new(&writer_type_name, proc_macro2::Span::mixed_site());
     let writes = generate_parts(parts, &runtime, &writer, Syntax::Async);
     quote! {
         #declaration
@@ -336,6 +353,22 @@ pub fn async_template(input: TokenStream) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn writer_type_names_avoid_nested_and_raw_identifiers() {
+        assert_eq!(writer_type_name(quote! {}), "__RazorWriter");
+        assert_eq!(
+            writer_type_name(quote! {
+                struct Page<__RazorWriter> { model: __RazorWriter } => {
+                    if true {
+                        {__RazorWriter_::TEXT}
+                        for value in [r#__RazorWriter__::TEXT] { {value} }
+                    }
+                }
+            }),
+            "__RazorWriter___"
+        );
+    }
 
     #[test]
     fn parses_literals_and_expressions() {
