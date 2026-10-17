@@ -3,15 +3,17 @@
 //! The synchronous [`crate::Slice`] trait renders to an in-memory buffer
 //! (`String` / `Vec<u8>`). Upstream's primary rendering path is async and
 //! streaming (`RenderAsync(PipeWriter, ...)` / `RenderAsync(TextWriter, ...)`),
-//! writing directly into the HTTP response body as the template renders,
-//! rather than building a full buffer first. This module adds the Rust
-//! equivalent, tracked in <https://github.com/davidfowl/razor-rust/issues/11>.
+//! writing into the destination as the template renders, rather than building
+//! a full buffer first. [`AsyncSlice`] / [`render_incremental`] provide this
+//! execution path; [`render_async`] retains the buffered synchronous bridge.
+//! HTTP integration remains separate work. This module is tracked in
+//! <https://github.com/davidfowl/razor-rust/issues/11>.
 //!
 //! ## Runtime dependency
 //!
 //! This crate does not mandate any particular async runtime for its core
 //! rendering path. [`AsyncSliceWriter`] is a minimal, hand-rolled trait (using
-//! native `async fn` in traits, stable since Rust 1.75 — this crate's MSRV) so
+//! return-position `impl Future` in traits, stable since Rust 1.75, our MSRV) so
 //! that consumers on `tokio`, `async-std`, `smol`, or any other executor can
 //! all implement it for their own writer types without this crate pulling in
 //! any of them as a mandatory dependency. A ready-made adapter for
@@ -24,6 +26,15 @@
 use std::io;
 
 use crate::{RenderError, Slice};
+
+mod incremental;
+mod layout;
+mod sections;
+mod value;
+pub use incremental::{render_incremental, AsyncHtmlWriter, AsyncSlice};
+pub use layout::{declare_async_layout, with_async_layout, AsyncLayout, DeclaredAsyncLayout};
+pub use sections::{with_async_section, AsyncSectioned};
+pub use value::AsyncWriteHtmlValue;
 
 /// A minimal, runtime-agnostic async byte sink used by streaming rendering.
 ///
@@ -45,15 +56,14 @@ pub trait AsyncSliceWriter {
     ///
     /// This is the equivalent of upstream's mid-template `FlushAsync()`,
     /// used by the streaming sample to push partially-rendered output to the
-    /// client before the rest of the template has finished rendering. Actual
-    /// mid-template flush *calls* require `@await`/async support in
-    /// generated template code, tracked separately in
-    /// <https://github.com/davidfowl/razor-rust/issues/3>; this trait method
-    /// is the runtime primitive those call sites will use once that lands.
+    /// client before the rest of the template has finished rendering.
+    /// [`AsyncSlice`] implementations call this through
+    /// [`AsyncHtmlWriter::flush`]; generated [`crate::async_template!`] bodies
+    /// can use the explicit `@flush;` directive.
     fn flush(&mut self) -> impl std::future::Future<Output = io::Result<()>> + Send;
 }
 
-/// An error that occurred while rendering a [`Slice`] asynchronously.
+/// An error that occurred while rendering a slice asynchronously.
 #[derive(Debug)]
 pub enum AsyncRenderError {
     /// Rendering the template body failed.
@@ -102,11 +112,10 @@ impl From<io::Error> for AsyncRenderError {
 /// an HTTP response body) is expected today, without waiting on template
 /// codegen to support genuine incremental, mid-template streaming.
 ///
-/// True streaming — writing output as each template section renders, with
-/// `@await`-driven mid-template flushes — requires generated `Slice` impls
-/// that call [`AsyncSliceWriter`] directly as they render, which depends on
-/// async/`@await` support in codegen (#3). This function is the interim
-/// (and likely permanent fallback) path for slices that don't need that.
+/// For true incremental execution and mid-template flushes, implement
+/// [`AsyncSlice`] (or declare one with [`crate::async_template!`]) and use
+/// [`render_incremental`]. This function retains the
+/// fully buffered behavior for existing synchronous slices.
 pub async fn render_async(
     slice: &(impl Slice + ?Sized),
     writer: &mut impl AsyncSliceWriter,
@@ -223,6 +232,72 @@ mod tests {
 
         assert_eq!(writer.buf, b"<p>Hello, World!</p>");
         assert!(writer.flushed);
+    }
+
+    struct BytesOverride;
+
+    impl Slice for BytesOverride {
+        fn render(&self, _: &mut dyn fmt::Write) -> fmt::Result {
+            Err(fmt::Error)
+        }
+
+        fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+            Ok("bytes override: \u{e9}".as_bytes().to_vec())
+        }
+    }
+
+    #[test]
+    fn render_async_preserves_byte_overrides_through_wrappers() {
+        fn assert_bytes<S: Slice>(slice: S) {
+            let mut writer = VecWriter {
+                buf: Vec::new(),
+                flushed: false,
+            };
+            block_on(render_async(&slice, &mut writer)).unwrap();
+            assert_eq!(writer.buf, "bytes override: \u{e9}".as_bytes());
+            assert!(writer.flushed);
+        }
+
+        assert_bytes(&BytesOverride);
+        assert_bytes(Box::new(BytesOverride));
+        let by_ref: &dyn Slice = &BytesOverride;
+        assert_bytes(by_ref);
+        let boxed: Box<dyn Slice> = Box::new(BytesOverride);
+        assert_bytes(&boxed);
+        assert_bytes(boxed);
+    }
+
+    #[test]
+    fn render_async_preserves_wrapped_render_errors_without_writing() {
+        struct FailingBytesOverride;
+
+        impl Slice for FailingBytesOverride {
+            fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+                writer.write_str("render succeeds")
+            }
+
+            fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
+                Err(RenderError(fmt::Error))
+            }
+        }
+
+        fn assert_error<S: Slice>(slice: S) {
+            let mut writer = VecWriter {
+                buf: Vec::new(),
+                flushed: false,
+            };
+            assert!(matches!(
+                block_on(render_async(&slice, &mut writer)),
+                Err(AsyncRenderError::Render(_))
+            ));
+            assert!(writer.buf.is_empty());
+            assert!(!writer.flushed);
+        }
+
+        assert_error(&FailingBytesOverride);
+        let boxed: Box<dyn Slice> = Box::new(FailingBytesOverride);
+        assert_error(&boxed);
+        assert_error(boxed);
     }
 
     /// Polls `fut` to completion without a real async runtime/executor.

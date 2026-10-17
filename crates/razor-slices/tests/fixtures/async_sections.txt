@@ -1,0 +1,5 @@
+Before releasing section await: <page><header>Loading...</header>
+After releasing section await:
+<h1>&lt;雪 &amp; ready&gt;</h1>
+<main>Body</main>
+</page>

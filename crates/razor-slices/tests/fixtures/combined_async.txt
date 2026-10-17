@@ -1,0 +1,10 @@
+borrowed-model:
+prefix-before-release: <html><title>&lt;Combined&gt;</title><main><h1 data-count="2">&lt;Combined&gt;</h1><header checked="checked" title="&lt;&amp;&quot;&#39;">true<b>trusted</b>
+prefix-before-release: <html><title>&lt;Combined&gt;</title><main><h1 data-count="2">&lt;Combined&gt;</h1><header checked="checked" title="&lt;&amp;&quot;&#39;">true<b>trusted</b>
+document: <html><title>&lt;Combined&gt;</title><main><h1 data-count="2">&lt;Combined&gt;</h1><header checked="checked" title="&lt;&amp;&quot;&#39;">true<b>trusted</b>&lt;Combined&gt;</header><article data-count="2" empty="">&lt;body&gt; &amp; 雪 -1.5 false<aside><b>trusted</b></aside></article></main><footer><a data-count="2">&lt;Combined&gt;<b>trusted</b></a></footer></html>
+partial: <article data-count="2" empty="">&lt;body&gt; &amp; 雪 -1.5 false<aside><b>trusted</b></aside></article>
+owned-model:
+prefix-before-release: <html><title>&lt;Combined&gt;</title><main><h1 data-count="2">&lt;Combined&gt;</h1><header checked="checked" title="&lt;&amp;&quot;&#39;">true<b>trusted</b>
+prefix-before-release: <html><title>&lt;Combined&gt;</title><main><h1 data-count="2">&lt;Combined&gt;</h1><header checked="checked" title="&lt;&amp;&quot;&#39;">true<b>trusted</b>
+document: <html><title>&lt;Combined&gt;</title><main><h1 data-count="2">&lt;Combined&gt;</h1><header checked="checked" title="&lt;&amp;&quot;&#39;">true<b>trusted</b>&lt;Combined&gt;</header><article data-count="2" empty="">&lt;body&gt; &amp; 雪 -1.5 false<aside><b>trusted</b></aside></article></main><footer><a data-count="2">&lt;Combined&gt;<b>trusted</b></a></footer></html>
+partial: <article data-count="2" empty="">&lt;body&gt; &amp; 雪 -1.5 false<aside><b>trusted</b></aside></article>

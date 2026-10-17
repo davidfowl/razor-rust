@@ -42,9 +42,63 @@ jobs:
       - name: Test
         run: cargo test --workspace ${{ matrix.cargo-flags }}
 
+      - name: Test renamed runtime dependency
+        if: matrix.features == 'default'
+        run: cargo test --manifest-path crates/razor-slices/tests/renamed/Cargo.toml
+
       - name: Run examples
         if: matrix.features == 'default'
-        run: cargo run -p razor-slices --example hello
+        run: |
+          cargo run -p razor-slices --example hello
+          cargo run -p razor-slices --example inline
+          cargo run -p razor-slices --example todos > target/todos-output.html
+          diff -u crates/razor-slices/tests/fixtures/todos.html target/todos-output.html
+          cargo run -p razor-slices --example layout > target/layout-output.html
+          diff -u crates/razor-slices/tests/fixtures/layout.html target/layout-output.html
+          cargo run -p razor-slices --example sections > target/sections-output.html
+          diff -u crates/razor-slices/tests/fixtures/sections.html target/sections-output.html
+          cargo run -p razor-slices --example declared_layout > target/declared-layout-output.html
+          diff -u crates/razor-slices/tests/fixtures/declared-layout.html target/declared-layout-output.html
+          cargo run -p razor-slices --example integration > target/integration-output.html
+          diff -u crates/razor-slices/tests/fixtures/integration.html target/integration-output.html
+
+      - name: Verify incremental section example
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run -p razor-slices --example async_sections --features tokio > target/async-sections-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_sections.txt target/async-sections-output.txt
+
+      - name: Verify declared async template prefix handshake and stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run -p razor-slices --example async_template --features tokio > target/async-template-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
+
+      - name: Verify generated mixed-value prefix handshake and stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run -p razor-slices --example async_values --features tokio > target/async-values-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_values.txt target/async-values-output.txt
+
+      - name: Verify nested async layout section handshake and bare partial stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run --locked -p razor-slices --example async_layout --features tokio > target/async-layout-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_layout.txt target/async-layout-output.txt
+          cat target/async-layout-output.txt
+
+      - name: Verify combined async values layouts and partial stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run --locked -p razor-slices --example combined_async --features tokio > target/combined-async-output.txt
+          diff -u crates/razor-slices/tests/fixtures/combined_async.txt target/combined-async-output.txt
+          cat target/combined-async-output.txt
+
+      - name: Verify automatic completed-child flush and exact stdout
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run --locked -p razor-slices --example automatic_flush --features tokio > target/automatic-flush-output.txt
+          diff -u crates/razor-slices/tests/fixtures/automatic_flush.txt target/automatic-flush-output.txt
 
   docs:
     runs-on: ubuntu-latest
@@ -103,3 +157,30 @@ jobs:
 
       - name: Test with MSRV
         run: cargo test --workspace ${{ matrix.cargo-flags }}
+
+      - name: Test renamed runtime dependency with MSRV
+        if: matrix.features == 'default'
+        run: cargo test --manifest-path crates/razor-slices/tests/renamed/Cargo.toml
+
+      - name: Verify integrated sample with MSRV
+        run: |
+          cargo run -p razor-slices --example integration ${{ matrix.cargo-flags }} > target/integration-output.html
+          diff -u crates/razor-slices/tests/fixtures/integration.html target/integration-output.html
+
+      - name: Verify async sample handshakes with MSRV
+        if: matrix.features == 'all-features'
+        run: |
+          cargo run -p razor-slices --example async_sections --features tokio > target/async-sections-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_sections.txt target/async-sections-output.txt
+          cargo run -p razor-slices --example async_template --features tokio > target/async-template-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_template.txt target/async-template-output.txt
+          cargo run -p razor-slices --example async_values --features tokio > target/async-values-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_values.txt target/async-values-output.txt
+          cargo run --locked -p razor-slices --example async_layout --features tokio > target/async-layout-output.txt
+          diff -u crates/razor-slices/tests/fixtures/async_layout.txt target/async-layout-output.txt
+          cat target/async-layout-output.txt
+          cargo run --locked -p razor-slices --example combined_async --features tokio > target/combined-async-output.txt
+          diff -u crates/razor-slices/tests/fixtures/combined_async.txt target/combined-async-output.txt
+          cat target/combined-async-output.txt
+          cargo run --locked -p razor-slices --example automatic_flush --features tokio > target/automatic-flush-output.txt
+          diff -u crates/razor-slices/tests/fixtures/automatic_flush.txt target/automatic-flush-output.txt

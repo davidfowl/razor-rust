@@ -1,0 +1,11 @@
+[package]
+name = "renamed-runtime-check"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.75"
+publish = false
+
+[workspace]
+
+[dependencies]
+slices = { package = "razor-slices", path = "../.." }

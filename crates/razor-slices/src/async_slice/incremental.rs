@@ -1,0 +1,252 @@
+//! Incremental async template execution, independent of synchronous `Slice`.
+
+use std::{future::Future, io};
+
+use super::{AsyncRenderError, AsyncSliceWriter, AsyncWriteHtmlValue};
+use crate::encode_html_to_writer;
+
+/// A reusable template that writes output while awaiting work in template order.
+///
+/// Unlike [`super::render_async`], this contract never buffers the whole template.
+/// Implementations await each write/flush and propagate errors with `?`. Call
+/// [`render_incremental`] for a final flush after successful execution; nested
+/// templates use [`AsyncHtmlWriter::write_slice`] for completion auto-flush.
+/// Raw trait calls remain execution hooks without an implicit final flush.
+///
+/// This statically dispatched trait is not object-safe. Its futures are `Send`;
+/// it does not alter the synchronous [`crate::Slice`] contract or `html!` grammar.
+/// [`crate::async_template!`] generates reusable implementations of this trait.
+/// Repeated renders execute the implementation again. Implementations own any
+/// state or side effects; the runtime does not cache output or reset model state.
+pub trait AsyncSlice: Sync {
+    /// Executes the full template without an implicit final flush.
+    ///
+    /// Declared/explicit layout implementations check completed layout
+    /// boundaries; use [`AsyncHtmlWriter::write_slice`] for child execution.
+    ///
+    /// Dropping the returned future stops polling it. Output already accepted
+    /// by the writer is not rolled back, and application work spawned separately
+    /// is not cancelled. See [`render_incremental`] for cancellation limitations.
+    fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send;
+
+    /// Executes this slice as a child, bypassing declared layouts.
+    ///
+    /// Explicit document composition remains composed. Handwritten partials
+    /// should call this method, just like generated `@render` directives.
+    fn render_body_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send {
+        self.render_into(output)
+    }
+
+    /// Executes a named section at its insertion point, without a final flush.
+    ///
+    /// Names are nonempty and case-sensitive; unknown sections write nothing by
+    /// default, matching upstream's optional section execution. Use
+    /// [`super::with_async_section`] for explicit associations or override this
+    /// method for handwritten providers. Implementations must reject empty
+    /// names and propagate errors. [`AsyncHtmlWriter::write_section`] validates
+    /// names before dispatching, including to custom providers.
+    fn render_section_into<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        _output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> impl Future<Output = Result<(), AsyncRenderError>> + Send {
+        async move { super::sections::validate_name(name).map_err(Into::into) }
+    }
+}
+
+impl<S: AsyncSlice + ?Sized> AsyncSlice for &S {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_into(output).await
+    }
+
+    async fn render_body_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_body_into(output).await
+    }
+
+    async fn render_section_into<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_section_into(name, output).await
+    }
+}
+
+impl<S: AsyncSlice + ?Sized> AsyncSlice for Box<S> {
+    async fn render_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_into(output).await
+    }
+
+    async fn render_body_into<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_body_into(output).await
+    }
+
+    async fn render_section_into<W: AsyncSliceWriter + Send>(
+        &self,
+        name: &str,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> Result<(), AsyncRenderError> {
+        (**self).render_section_into(name, output).await
+    }
+}
+
+/// HTML-aware output for incremental async templates.
+///
+/// Literal writes borrow their input directly. Escaped values reuse the existing
+/// HTML encoder in chunks of at most 1,024 input bytes, with a fixed 6,144-byte
+/// scratch buffer (the largest entity is six bytes). No full-value or full-page
+/// allocation, channel, background task, or blocking executor is used.
+///
+/// Every write awaits the destination before advancing. `write_all` means the
+/// sink accepted all bytes, not necessarily that a client received them; explicit
+/// [`Self::flush`] requests visibility according to the sink's own contract.
+pub struct AsyncHtmlWriter<'a, W> {
+    writer: &'a mut W,
+    unflushed_bytes: usize,
+}
+
+impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
+    /// Borrows the destination without taking ownership or closing it.
+    pub fn new(writer: &'a mut W) -> Self {
+        Self {
+            writer,
+            unflushed_bytes: 0,
+        }
+    }
+
+    /// Writes trusted literal markup without escaping.
+    ///
+    /// Do not use this for untrusted model values; use [`Self::write_value`].
+    pub async fn write_literal(&mut self, literal: &str) -> io::Result<()> {
+        self.writer.write_all(literal.as_bytes()).await?;
+        self.record_write(literal.len());
+        Ok(())
+    }
+
+    /// Writes a string value, escaping `&`, `<`, `>`, `"`, and `'`.
+    ///
+    /// Preserves UTF-8, including characters crossing the chunk boundary.
+    /// Like the synchronous encoder, this does not implement the broader
+    /// Unicode allow-list policy of ASP.NET Core's default `HtmlEncoder`.
+    pub async fn write_value(&mut self, mut value: &str) -> io::Result<()> {
+        let mut scratch = [0; 6 * 1_024];
+        while !value.is_empty() {
+            let mut end = value.len().min(1_024);
+            while !value.is_char_boundary(end) {
+                end -= 1;
+            }
+            let (chunk, rest) = value.split_at(end);
+            let mut buffer = io::Cursor::new(scratch.as_mut_slice());
+            encode_html_to_writer(chunk, &mut buffer)?;
+            let len = buffer.position() as usize;
+            self.writer.write_all(&scratch[..len]).await?;
+            self.record_write(len);
+            value = rest;
+        }
+        Ok(())
+    }
+
+    /// Writes an explicitly supported typed value without buffering or flushing.
+    ///
+    /// This is the generated interpolation path. [`Self::write_value`] remains
+    /// the string-only encoding API, including its existing coercions.
+    pub async fn write_html_value(
+        &mut self,
+        value: &(impl AsyncWriteHtmlValue + ?Sized),
+    ) -> io::Result<()> {
+        value.write_html_async(self).await
+    }
+
+    fn record_write(&mut self, len: usize) {
+        self.unflushed_bytes = self.unflushed_bytes.saturating_add(len);
+    }
+
+    /// Executes a child without its declared layout, then checks auto-flush.
+    ///
+    /// At successful slice completion, at least 16,384 accepted output bytes
+    /// since the last flush trigger an awaited flush. This is an inclusive byte
+    /// threshold, not a per-write or arbitrary-await trigger. Counts are shared
+    /// across children, encoded values and layouts on this output.
+    pub async fn write_slice(
+        &mut self,
+        slice: &(impl AsyncSlice + ?Sized),
+    ) -> Result<(), AsyncRenderError> {
+        slice.render_body_into(self).await?;
+        if self.should_auto_flush() {
+            self.flush().await?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn should_auto_flush(&self) -> bool {
+        self.unflushed_bytes >= 16 * 1_024
+    }
+
+    /// Executes a named section without adding a dispatch-level auto-flush.
+    ///
+    /// Section templates encode their own values; this insertion does not
+    /// re-encode their markup. Empty names fail with an `InvalidInput` I/O error
+    /// inside [`AsyncRenderError::Write`] before calling the provider. Unknown
+    /// nonempty names are optional and write nothing by default. Child slices
+    /// rendered inside a section retain their own completion boundaries.
+    pub async fn write_section(
+        &mut self,
+        slice: &(impl AsyncSlice + ?Sized),
+        name: &str,
+    ) -> Result<(), AsyncRenderError> {
+        super::sections::validate_name(name)?;
+        slice.render_section_into(name, self).await
+    }
+
+    /// Awaits a mid-template flush, propagating backpressure and failure.
+    pub async fn flush(&mut self) -> io::Result<()> {
+        // Upstream resets accounting when the flush is requested, including
+        // a pending/failed flush; accepted output is never rolled back.
+        self.unflushed_bytes = 0;
+        self.writer.flush().await
+    }
+}
+
+/// Executes an [`AsyncSlice`] incrementally and flushes after success.
+///
+/// Earlier output can be observed before later awaited work completes, provided
+/// the destination exposes it (use a mid-template flush for buffered sinks).
+/// Writer or template errors return immediately: there is no success fallback,
+/// retry, rollback, or final flush after an error.
+///
+/// Cancellation is by dropping this future, not a built-in cancellation token.
+/// A pending write may already have accepted a prefix, depending on the sink;
+/// do not restart a cancelled render on the same destination expecting atomic
+/// output. Cancellation of application awaits is their responsibility. The
+/// destination remains caller-owned and is not shut down. Completed children
+/// and layouts check the 16,384-byte auto-flush threshold; writes and plain
+/// section dispatch do not. C# `PipeWriter` completion/cancellation flags are
+/// not provided. Accounting starts at zero for each new output borrow and
+/// counts only successful writes through it, not preexisting sink buffers.
+pub async fn render_incremental(
+    slice: &(impl AsyncSlice + ?Sized),
+    writer: &mut (impl AsyncSliceWriter + Send),
+) -> Result<(), AsyncRenderError> {
+    let mut output = AsyncHtmlWriter::new(writer);
+    slice.render_into(&mut output).await?;
+    output.flush().await?;
+    Ok(())
+}

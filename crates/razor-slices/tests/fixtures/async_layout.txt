@@ -1,0 +1,5 @@
+prefix-before-section-await: <html><title>&lt;Title&gt;</title><main><h1>&lt;Title&gt;</h1><header>
+prefix-before-section-await: <html><title>&lt;Title&gt;</title><main><h1>&lt;Title&gt;</h1><header>
+document: <html><title>&lt;Title&gt;</title><main><h1>&lt;Title&gt;</h1><header>&lt;Title&gt;</header><p>&lt;body&gt; &amp; 雪</p></main><footer>&lt;inner links&gt;</footer></html>
+partial: <p>&lt;body&gt; &amp; 雪</p>
+section-renders: 2
