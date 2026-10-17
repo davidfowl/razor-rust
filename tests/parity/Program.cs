@@ -1,5 +1,11 @@
 using RazorSlices;
 
+if (args is ["layout-lifecycle"])
+{
+    await LayoutLifecycleCases.Run();
+    return;
+}
+
 if (args is ["render-lifecycle"])
 {
     await LifecycleCases.Run();
