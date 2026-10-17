@@ -70,8 +70,18 @@ The `fmt::Write` bridge decodes UTF-8 incrementally, including split code points
 without buffering the whole output. Invalid/incomplete UTF-8 and value/writer
 failures become `fmt::Error` on `Slice::render`, as required by that existing
 interface; convenience rendering wraps it in `RenderError`. Direct byte output
-does not validate custom value bytes. Writes stop at the first error; a failed
-render may leave partial output, but the template remains reusable.
+does not validate custom value bytes. Generated writes stop at the first error;
+a failed render may leave partial output, but the template remains reusable.
+If handwritten values explicitly attempt cleanup writes after an error, completed
+or invalid pending UTF-8 is not replayed into those writes. This is decoder-state
+cleanup, not an automatic retry or output rollback; custom implementations must
+still propagate their original errors.
+
+Ordinary Rust ownership controls resource cleanup. Render-local values are
+dropped when execution returns, including on error; captured model resources
+remain owned by the reusable template until its owner drops it. Rendering borrows
+the destination without closing it or consuming the template. See the
+[bounded lifecycle evidence](../../docs/parity.md#render-lifecycle-and-error-state-cleanup).
 
 The runtime's declarative entry point supplies a hygienic crate path to the
 proc macro, so renamed Cargo dependencies work without crate-name discovery.

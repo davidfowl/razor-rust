@@ -1,5 +1,11 @@
 using RazorSlices;
 
+if (args is ["render-lifecycle"])
+{
+    await LifecycleCases.Run();
+    return;
+}
+
 if (args is ["character-values"])
 {
     await OptionalValueCases.RunCharacters();

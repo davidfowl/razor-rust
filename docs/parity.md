@@ -28,6 +28,8 @@ An implemented row is not blanket verification of its whole feature.
 | Generated async writer type does not shadow identifiers visible in the invocation | Implemented, Rust-specific | `compiler_hygiene` renders associated constants twice with exact escaped output; macro unit coverage includes nested/raw identifiers and generic names. Identifiers introduced by later nested macro expansion are outside this scan. No C# differential claim. |
 | Raw model field spelling and conditional-compilation validation | Implemented, Rust-specific | `compiler_raw_identifiers` checks owned/borrowed constructors and render-body compilation; macro unit tests accept `r#model`, reject wrong/multiple fields and retain the invocation-level `cfg`/`cfg_attr` guard for ordinary/raw spellings on structs/fields. This is compiler compatibility, not runtime/lifecycle equivalence. |
 | Render-local code blocks preserve bindings and semicolon-less unit expression tails | Implemented, Rust-specific | `compiler_code_blocks` renders exact escaped output twice, with zero construction effects and five effects per render, including nested/attributed/awaited tails. Four standalone doctests include positive binding scope and rejection of integer, `Result` and unawaited future tails. No C# differential or lifecycle equivalence claim. |
+| Text bridge discards completed/invalid pending UTF-8 after errors without panicking or replaying bytes on explicit cleanup writes | Implemented, Rust-specific | `render_lifecycle` covers every split of selected two/three/four-byte scalars, original formatting/UTF-8 error types, malformed pending sequences and repeated rendering. This repairs the inline #30 bridge's error state, not the C# encoder policy. |
+| Render-local resources drop after write/flush errors while model/layout captures and destinations remain owned by callers | Implemented, bounded | Four `render_lifecycle` tests include synchronous text/byte errors and nested generated async layout reuse after write/final-flush errors. Original I/O kind/source identity, accepted prefix, local/captured/destination drop counts and persistent application effects are checked. No cancellation/token acceptance is included. |
 | Optional body values: absent output, encoded string, nullable integer/float and trusted HTML | Verified, bounded | Twelve `optional-values` cases use both pinned C# PipeWriter/TextWriter paths and match `fixtures/optional-values.txt` in synchronous text/byte and generated async Rust paths. Rust `Option<T>` delegates `Some` and emits nothing for `None`. This does not establish broad encoder/culture/boolean formatting equivalence. |
 | Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
 | Character body/nullable/attribute output in the selected common ASCII subset | Verified, bounded | Fourteen `character-values` cases match actual pinned C# PipeWriter/TextWriter output and generated sync text/byte/async Rust paths via `fixtures/character-values.txt`. Character support is additive; broader Unicode/quote-policy equivalence is not claimed. |
@@ -41,7 +43,7 @@ An implemented row is not blanket verification of its whole feature.
 | Native flush-result flags versus faulted/cancelled operations | Missing, reference characterized | The C#-only `flush-outcomes` mode below records twelve reference cases. Native flags are not exposed by Rust; the TextWriter completion subset now has separate bounded differential evidence above. |
 | Typed request scope and cancellation; buffered/streaming HTTP | Implemented | `request_context` and Axum transport tests. Broader request/layout assembly #69, framework service injection, portable response-start and lifecycle equivalence remain unverified/missing under #47/#52/#11. |
 | Configurable .NET `HtmlEncoder`, broader Unicode/numeric/date formatting | Missing | Rust's five-character encoder and fixed primitive formatting are not byte-for-byte configurable C# policy parity. Requires dedicated differential cases and explicit compatibility decisions. |
-| C# initialization, pooling and disposal lifecycle | Missing | Rust borrows/re-executes reusable templates; it does not emulate C# instance disposal/pooling. #47/#11/#52 remain open scope. |
+| C# initialization, pooling and disposal lifecycle | Missing, reference characterized | Eight C#-only `render-lifecycle` cases measure initialization, local cleanup, `Dispose` override calls, destination ownership and explicit same-instance retry after success/error. Rust retains ordinary ownership rather than copying per-render disposal. Pooling/layout disposal cascades and framework/service lifetime equivalence remain unverified under #47/#11/#52. |
 | Razor files/`@section` syntax, async trait objects and local-only async futures | Unsupported | Current authoring is the accepted inline proc-macro mechanism, not Razor parsing. Upstream also avoids Razor `@section`; Rust sections are explicit providers. No additional authoring/API approval is implied. |
 
 ## Rust compiler compatibility
@@ -87,6 +89,71 @@ asserting zero effects at construction and effect counts of five and ten after
 the two renders. Its four doctests preserve rejection of integer, `Result`
 and unawaited future tails. This is Rust code-generation correctness, not new
 cross-language or cancellation/lifecycle parity.
+
+## Render lifecycle and error-state cleanup
+
+The live #11 discussion leaves initialization/disposal and writer lifecycle
+parity open. #47 covers section/layout context and error boundaries; #52
+separately covers HTTP peer disconnect, request cancellation and response start.
+None requires copying a managed pooling/disposal architecture into Rust.
+The existing inline #30 contract also includes split UTF-8 and writer errors.
+This increment addresses a demonstrated bridge error-state bug and records
+bounded ownership evidence; it does not complete any of those parent scopes.
+
+Before the bridge fix, an error forwarding a completed four-byte code point
+left `TextWriter.len == 4`. An explicitly handled error followed by a cleanup
+write indexed outside its four-byte array. Malformed pending UTF-8 could leave
+the same invalid state. Completed two/three-byte code points could instead
+leak into a later cleanup write. The bridge now clears completed/invalid state
+before returning the error, without changing error types, accepted output,
+validation of malformed input, or normal incomplete-code-point buffering.
+Generated rendering still stops at the first error. The regressions explicitly
+attempt cleanup inside handwritten code and then return the original error;
+there is no implicit retry, output rollback or error swallowing.
+
+Four Rust regressions in `tests/render_lifecycle.rs` cover every split of
+selected two/three/four-byte scalars, malformed pending sequences, repeated
+renders, and ordinary resource ownership. Synchronous closures and generated
+nested async layouts release render-local guards on write/final-flush errors,
+but retain owned model/layout captures until their owner is dropped. Borrowed
+destinations remain open. The same template can be rendered again; application
+effects persist and are not reset or rolled back. These are Rust contracts,
+not a new disposal callback API or cancellation acceptance.
+
+The new **C#-only** `render-lifecycle` mode executes eight cases against the
+unchanged pinned runtime: PipeWriter/TextWriter, synchronous/explicitly held
+execution, and success/write failure, each followed by a new-destination render
+of the same instance. It checks exception identity and records:
+
+- One initializer call, two executions and two render-local `using` disposals.
+- Two automatic `Dispose` override calls for two successful renders, but one
+  for a failed render followed by success. This counts override invocations,
+  not physical resource releases; a fault is not an automatic slice-disposal
+  guarantee in these paths.
+- No writer disposal/completion by rendering; each caller-owned writer ends
+  only when the harness explicitly disposes/completes it.
+
+Re-rendering the C# instance after a previous automatic `Dispose` is measured
+characterization, not a general upstream reuse guarantee. Rust deliberately
+retains reusable borrowed/owned templates and normal `Drop`, rather than
+emulating the reference's per-render calls or fault behavior. Pool reuse,
+layout disposal cascades, service scopes, HTTP ownership and cancellation
+remain separate acceptance. Any future managed-style lifecycle hook needs a
+specific use case and compatibility decision, not inference from this fixture.
+
+Using the pinned checkout described below:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- render-lifecycle > target/csharp-render-lifecycle.txt
+diff -u tests/parity/fixtures/render-lifecycle.txt target/csharp-render-lifecycle.txt
+cargo test --locked -p razor-slices --test render_lifecycle --test inline
+```
+
+The eight reference rows match both Debug and Release. They are not a shared
+Rust/C# lifecycle golden or new full initialization/pooling/disposal parity.
+No #69 request/layout cancellation tests, token contracts or fixtures change.
 
 ## Reproduce the C# golden
 
