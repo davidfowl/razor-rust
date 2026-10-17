@@ -33,11 +33,18 @@ Literal content, including spaces, newlines and braces, is preserved exactly.
 Outside literals, whitespace only separates Rust tokens. Bare HTML is rejected.
 The macro does not validate HTML structure or infer attribute contexts.
 
-Each expression must implement `WriteHtmlValue`. Strings escape `& < > " '`;
+Each expression must implement `WriteHtmlValue`. Strings and characters escape `& < > " '`;
 numbers and booleans use the existing primitive formatting paths. `HtmlString`
 is an explicit trusted-HTML opt-out, never an automatic fallback for unsupported
 types. Do not wrap untrusted input in `HtmlString`. HTML escaping is not URL,
 JavaScript or CSS sanitization.
+
+Characters encode one Rust Unicode scalar through the same UTF-8 string path,
+using a four-byte stack buffer without allocation or implicit flushing.
+For example, `{'&'}` emits `&amp;`; references, optional characters and
+`attribute("data-char", '&')` use the same contracts. This does not emulate
+C# UTF-16 code units or change the existing string encoder's Unicode policy.
+See [the exact shared subset and remaining differences](../../docs/parity.md#character-values-and-primitive-outcomes-79).
 
 `Option<T>` is supported when `T: WriteHtmlValue`: `None` emits nothing and
 `Some` borrows/delegates to the value without cloning, adding delimiters or

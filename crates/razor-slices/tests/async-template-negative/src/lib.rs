@@ -196,10 +196,10 @@
 //! async_template! { struct Page { model: String } => { @{ async {}; } } }
 //! ```
 //!
-//! Char is not an existing synchronous WriteHtmlValue type either.
+//! Character collections do not silently become strings.
 //! ```compile_fail
 //! use razor_slices::async_template;
-//! async_template! { struct Page { model: char } => { {model} } }
+//! async_template! { struct Page { model: Vec<char> } => { {model} } }
 //! ```
 //!
 //! A synchronous custom value must explicitly opt into async output.

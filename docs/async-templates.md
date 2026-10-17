@@ -61,7 +61,7 @@ or `{fetch(model).await?}`. Normal Rust diagnostics still apply to code-block
 statements; the macro does not suppress must-use warnings.
 
 Interpolation uses the explicit `AsyncWriteHtmlValue` contract. Built-ins are
-`str`, `String`, references, `bool`, all Rust signed/unsigned integer families,
+`str`, `String`, `char`, references, `bool`, all Rust signed/unsigned integer families,
 `f32`/`f64`, trusted `HtmlString`, and validated `attribute(name, value)` adapters.
 `Option<T>` is also supported when `T` implements the explicit async contract:
 `None` performs no writes, and `Some` borrows/delegates to the existing value
@@ -85,7 +85,14 @@ inputs directly; the 6,144-byte encoded-write bound is not a maximum size for
 these raw writes. Scratch is independent of input length, not a bound on
 application-owned model memory, sink storage or custom implementation behavior.
 The original string-only `AsyncHtmlWriter::write_value` API remains intact.
-`char` is not currently a synchronous `WriteHtmlValue` type and is not added.
+`char` is supported on both paths: a four-byte UTF-8 stack buffer feeds the
+existing string encoder, preserving its five escapes, Unicode/control policy,
+awaited writes and byte accounting without allocation or implicit flush.
+References, optional values and character attributes delegate as usual.
+Rust `char` represents a Unicode scalar, not a C# UTF-16 code unit;
+collections do not silently become strings. The [shared character cases and
+primitive-outcome characterization](parity.md#character-values-and-primitive-outcomes-79)
+do not establish full .NET encoding or formatting equivalence.
 
 `attribute` keeps its existing validation and omission rules: true repeats the
 name, false/`None` omit the entire attribute, `Some` and references delegate,

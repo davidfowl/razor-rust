@@ -1,5 +1,17 @@
 using RazorSlices;
 
+if (args is ["character-values"])
+{
+    await OptionalValueCases.RunCharacters();
+    return;
+}
+
+if (args is ["primitive-outcomes"])
+{
+    await OptionalValueCases.RunPrimitiveOutcomes();
+    return;
+}
+
 if (args is ["optional-values"])
 {
     await OptionalValueCases.Run();

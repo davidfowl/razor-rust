@@ -53,10 +53,12 @@ rendering — without pulling in a full web/MVC framework.
 - Axum adapters for atomic buffered HTML responses and bounded incremental
   streaming responses, with runnable servers and real HTTP/1 regressions
   for prefix delivery, peer-disconnect cancellation and post-start failures.
-- Generated `async_template!` interpolation for bools/numbers, escaped
+- Generated `async_template!` interpolation for bools/numbers, escaped characters,
   strings/references, optional body values, explicit trusted `HtmlString` and conditional attributes.
   Both template paths support `Option<T>`: `None` emits nothing; `Some` delegates
   without consuming, re-encoding or flushing its value.
+  Character bodies/attributes reuse the string encoder; they do not change
+  Unicode policy or existing boolean/float formatting. See [bounded C# evidence](docs/parity.md#character-values-and-primitive-outcomes-79).
   Built-ins use fixed encoding/format scratch; custom values must explicitly
   implement `AsyncWriteHtmlValue`, not just `Display` or `WriteHtmlValue`.
 - Opt-in typed, borrowed request models and cooperative cancellation scopes.

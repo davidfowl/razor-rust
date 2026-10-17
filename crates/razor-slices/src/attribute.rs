@@ -33,7 +33,7 @@ impl std::error::Error for InvalidAttributeName {}
 
 /// A value with conditional attribute semantics.
 ///
-/// Strings, numbers and [`HtmlString`] use their existing [`WriteHtmlValue`]
+/// Strings, characters, numbers and [`HtmlString`] use their existing [`WriteHtmlValue`]
 /// implementation. Booleans repeat the attribute name for true and omit for
 /// false; [`Option`] omits `None` and delegates `Some`. References delegate.
 ///
@@ -278,6 +278,6 @@ macro_rules! impl_attribute_value {
 }
 
 impl_attribute_value!(
-    str, String, HtmlString, i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32,
-    f64,
+    str, String, char, HtmlString, i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize,
+    f32, f64,
 );

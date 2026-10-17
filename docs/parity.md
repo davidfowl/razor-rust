@@ -27,6 +27,9 @@ An implemented row is not blanket verification of its whole feature.
 | Generated typed models, nested control flow, primitive/trusted/attribute values | Implemented | Runtime `inline`, `control_flow`, `async_templates`, `attributes` tests and runnable value examples; broader grammar/date/custom formatting and encoder configuration remain #3/#2. |
 | Optional body values: absent output, encoded string, nullable integer/float and trusted HTML | Verified, bounded | Twelve `optional-values` cases use both pinned C# PipeWriter/TextWriter paths and match `fixtures/optional-values.txt` in synchronous text/byte and generated async Rust paths. Rust `Option<T>` delegates `Some` and emits nothing for `None`. This does not establish broad encoder/culture/boolean formatting equivalence. |
 | Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
+| Character body/nullable/attribute output in the selected common ASCII subset | Verified, bounded | Fourteen `character-values` cases match actual pinned C# PipeWriter/TextWriter output and generated sync text/byte/async Rust paths via `fixtures/character-values.txt`. Character support is additive; broader Unicode/quote-policy equivalence is not claimed. |
+| Character UTF-8/string-encoding consistency, original failures, backpressure, cancellation/drop and byte thresholds | Implemented | Eight `character_values` regressions cover Unicode scalar boundaries, optional/reference attributes, every failure offset including partial UTF-8, final-flush errors, held writes and 16,383/16,384/16,385-byte native/fallback thresholds. Existing bool/float representations stay unchanged. |
+| Boolean/float/quote/Unicode reference behavior beyond the shared subset | Missing, reference characterized | Eighteen C#-only `primitive-outcomes` cases below expose direct/generic boolean path differences and default formatting/encoder policy. These are not Rust differential verification or permission to copy a reference defect/change Rust defaults. |
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
 | Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
 | Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags remain unrepresented under #74. |
@@ -266,3 +269,77 @@ cancellation/drop and bounded encoding/completion accounting. Two compile-fail
 doctests retain rejection of unsupported optional payload types.
 This is bounded nullable-value dispatch/output evidence, not full .NET encoder,
 culture/date/number/boolean formatting or instance-lifecycle equivalence.
+
+## Character values and primitive outcomes (#79)
+
+Before selecting the runtime change, the unchanged pinned C# runtime was
+executed on both PipeWriter and TextWriter destinations. It supports character
+body/nullable/attribute output, while both Rust generated body paths and
+`attribute(name, char)` failed with `E0277`. The implementation adds `char` to
+`WriteHtmlValue`, `AsyncWriteHtmlValue` and the existing attribute value adapters.
+A four-byte UTF-8 stack buffer feeds the existing string encoder; it does not
+allocate, add syntax, bypass encoding or flush implicitly. References and
+optional values retain their existing delegation/omission contracts.
+
+Reproduce the fourteen shared character cases:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- character-values > target/csharp-character-values.txt
+diff -u crates/razor-slices/tests/fixtures/character-values.txt target/csharp-character-values.txt
+cargo test --locked -p razor-slices --test character_values
+```
+
+The [value harness](../tests/parity/OptionalValueCases.cs) requires actual C#
+pipe/text output to agree for the shared cases: selected ASCII characters,
+ampersand/angle-bracket/double-quote escapes, nullable characters and scalar/
+optional character attributes. Rust compares generated sync text/byte and
+async output with the same [golden](../crates/razor-slices/tests/fixtures/character-values.txt).
+The subset is not all ASCII or full .NET encoder equivalence.
+
+Rust `char` is a Unicode scalar, not a UTF-16 code unit; isolated surrogates
+cannot be represented. UTF-8 boundaries, controls, supplementary characters and
+the maximum scalar are tested against the **existing Rust string encoder**,
+not asserted equivalent to .NET's broader default encoder. The old negative
+`char` compiler case is now `Vec<char>`: adding scalar support does not add
+implicit collection or `Display` conversion.
+
+Eight regressions additionally preserve original I/O kind/source and accepted
+prefix at every body/attribute failure byte, including partial four-byte UTF-8,
+skip suffix/final flush after failure, retain final-flush errors and held-write
+backpressure/cancellation/drop, and count encoded versus UTF-8 bytes exactly at
+16,383/16,384/16,385-byte completion boundaries with native/fallback accounting.
+
+### Reference-only primitive characterization
+
+The same source was characterized before choosing the additive character fix:
+
+```sh
+dotnet run --project tests/parity/NestedLayoutSections.csproj \
+  -p:RazorSlicesSource="$(cd ../RazorSlices-parity-reference && pwd)" \
+  --verbosity quiet -- primitive-outcomes > target/csharp-primitive-outcomes.txt
+diff -u tests/parity/fixtures/primitive-outcomes.txt target/csharp-primitive-outcomes.txt
+```
+
+These [eighteen C#-only cases](../tests/parity/fixtures/primitive-outcomes.txt)
+are **not** asserted by Rust CI as byte parity:
+
+- Direct `Write(bool?)` produces no boolean bytes on PipeWriter, but title-case
+  `True`/`False` on TextWriter. Generic `Write<T>(bool)` produces title-case
+  output on both. The pinned `PipeWriterHtmlExtensions.Write(bool)` formats
+  into a span without advancing it. Rust deliberately retains its existing
+  lowercase `true`/`false`; it does not emulate lost reference output.
+- Under invariant culture, C# infinities are `Infinity`/`-Infinity`, while Rust
+  retains `inf`/`-inf`. Both measured negative-zero cases render `-0`.
+  C# uses `1E-30` and encoded `1E&#x2B;30` for the selected magnitudes; Rust
+  retains its existing decimal `Display` representation.
+- C# single quote is `&#x27;`, where Rust strings/characters retain `&#39;`.
+  Both measured double-quote paths produce `&quot;`. C# encodes the selected
+  BMP/supplementary scalars as `&#x96EA;`/`&#x1F980;`; Rust retains its existing
+  UTF-8 text policy.
+
+Broader primitive/encoder compatibility therefore requires an explicit bounded
+policy decision and its own differential cases, not a blanket default-format
+change or copying the direct-boolean path discrepancy. This increment leaves
+all existing Rust representations and public APIs intact.
