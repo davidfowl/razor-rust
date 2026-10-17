@@ -80,10 +80,11 @@ do not duplicate work already in progress.
   Dedicated cancellation tokens are signalled on unfinished body drop; explicit
   cancellation is a body error. Core request data remains explicit typed model
   input, not automatic framework/service injection. See docs/request-context.md.
-- This integration preview assembles unmerged deliveries, not a released
+- This integration preview assembles deliveries merged through #75, not a released
   full port. Broader generated value/grammar parity remains tracked in
   [#3](https://github.com/davidfowl/razor-rust/issues/3); synchronous nested
-  section context remains #66 and broader layout/request lifetime parity
+  section context #66 has bounded differential evidence in docs/parity.md;
+  broader layout/request lifetime parity
   remains #47/#52/#11. Typed async context is documented in docs/async-layouts.md.
   See [docs/integration.md](docs/integration.md) for exact source dependencies.
   Do not turn a proposed ADR or issue example into an accepted public API

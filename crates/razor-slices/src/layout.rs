@@ -18,17 +18,51 @@ pub trait Layout {
     /// subsequent output on error. Do not flush the destination implicitly.
     /// Body execution/order is controlled by the layout's insertion points.
     fn render_layout(&self, body: &dyn Slice, writer: &mut dyn io::Write) -> io::Result<()>;
+
+    /// Renders this layout's own named section for an outer layout.
+    ///
+    /// `body` is this layout's original bare content, retained even when the
+    /// outer layout inserts the section after body execution. A provider may
+    /// explicitly forward to `body`'s sections; lookup does not automatically
+    /// recurse. Unknown nonempty names write nothing; empty names are invalid.
+    /// Propagate destination errors and do not buffer or implicitly flush.
+    fn render_layout_section(
+        &self,
+        _body: &dyn Slice,
+        name: &str,
+        _writer: &mut dyn io::Write,
+    ) -> io::Result<()> {
+        crate::section::validate_name(name)
+    }
 }
 
 impl<L: Layout + ?Sized> Layout for &L {
     fn render_layout(&self, body: &dyn Slice, writer: &mut dyn io::Write) -> io::Result<()> {
         (**self).render_layout(body, writer)
     }
+
+    fn render_layout_section(
+        &self,
+        body: &dyn Slice,
+        name: &str,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<()> {
+        (**self).render_layout_section(body, name, writer)
+    }
 }
 
 impl<L: Layout + ?Sized> Layout for Box<L> {
     fn render_layout(&self, body: &dyn Slice, writer: &mut dyn io::Write) -> io::Result<()> {
         (**self).render_layout(body, writer)
+    }
+
+    fn render_layout_section(
+        &self,
+        body: &dyn Slice,
+        name: &str,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<()> {
+        (**self).render_layout_section(body, name, writer)
     }
 }
 
@@ -256,9 +290,40 @@ impl<S: Slice, L: Layout> Slice for DeclaredLayout<S, L> {
 
 impl<S: Layout, L: Layout> Layout for DeclaredLayout<S, L> {
     fn render_layout(&self, body: &dyn Slice, writer: &mut dyn io::Write) -> io::Result<()> {
-        let content =
-            InlineSlice::new(|w: &mut dyn io::Write| self.body.render_layout(&Body(body), w));
+        let content = LayoutContent {
+            layout: &self.body,
+            body,
+        };
         self.layout.render_layout(&content, writer)
+    }
+
+    fn render_layout_section(
+        &self,
+        body: &dyn Slice,
+        name: &str,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<()> {
+        self.body.render_layout_section(body, name, writer)
+    }
+}
+
+struct LayoutContent<'a, L> {
+    layout: &'a L,
+    body: &'a dyn Slice,
+}
+
+impl<L: Layout> Slice for LayoutContent<'_, L> {
+    fn render(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+        InlineSlice::new(|w: &mut dyn io::Write| self.render_to_writer(w)).render(writer)
+    }
+
+    fn render_to_writer(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.layout.render_layout(&Body(self.body), writer)
+    }
+
+    fn render_section_to_writer(&self, name: &str, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.layout
+            .render_layout_section(&Body(self.body), name, writer)
     }
 }
 

@@ -1,8 +1,8 @@
 # Typed declared layouts and bare child rendering
 
 Focused synchronous delivery for [#36](https://github.com/davidfowl/razor-rust/issues/36),
-a native child of layout epic #4. This branch stacks on Ready/unmerged
-PR #46 -> #35 -> #33 -> #31, not features already integrated on main.
+a native child of layout epic #4. The original delivery stacked on
+PR #46 -> #35 -> #33 -> #31; these deliveries were consolidated into main in #75.
 The additive API choice was recorded before implementation in #36; it is not
 claimed maintainer-approved generated declaration syntax.
 
@@ -72,8 +72,10 @@ exactly-once rendering.
 Sections attached before or after a body declaration remain accessible.
 Section insertion is lazy, repeats on each request, rejects empty names and
 writes nothing for unknown nonempty names. Declared layouts on associated
-section content are bypassed. No implicit inheritance of section context
-through nested layout declarations is claimed.
+section content are bypassed. An outer declared layout sees its immediate inner
+layout's own section provider. A custom `Layout::render_layout_section` receives
+that provider's original bare body, even after body execution, and can explicitly
+forward to its sections. There is no automatic recursive name lookup.
 
 Byte/value/destination errors retain their original I/O kind and source.
 Early layout failure skips the body, and body failure skips all later tails.
@@ -99,12 +101,14 @@ declared body wrappers.
 This delivery uses typed Rust association values and factories, not C# proxy
 creation, generated model declarations or a new DSL. Generated declaration
 integration remains in [#3](https://github.com/davidfowl/razor-rust/issues/3).
-Inherited nested section context, async layouts/sections, cancellation,
-initialization/disposal and lifecycle parity remain in
+Synchronous immediate-content section context has
+[bounded C# differential coverage](../../docs/parity.md) for #66.
+Async layouts/sections are documented in [async-layouts.md](../../docs/async-layouts.md).
+Broader cancellation, initialization/disposal and lifecycle parity remain in
 [#47](https://github.com/davidfowl/razor-rust/issues/47) and
 [#11](https://github.com/davidfowl/razor-rust/issues/11).
-In particular an outer layout does not automatically discover the inner
-layout's own named sections; explicit section associations still work.
+`with_section` retains either a `Slice` or `Layout` contract, allowing lazy
+sections on an inner layout without erasing its layout behavior.
 No Razor `@section` grammar is added. Encoding uses the existing Rust encoder,
 not byte-for-byte configurable .NET `HtmlEncoder` parity.
 Neither #4 nor the whole port is complete, and delivery is not merge approval.

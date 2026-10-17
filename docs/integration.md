@@ -190,8 +190,8 @@ scaffolding.
 This follow-up source adds typed async declarations and immediate-content
 layout/section context in [#64 / PR #65](https://github.com/davidfowl/razor-rust/pull/65);
 see [async-layouts.md](async-layouts.md) for exact full/partial output and its
-observable section handshake. Synchronous nested provider context remains
-[#66](https://github.com/davidfowl/razor-rust/issues/66), with broader layout
+observable section handshake. Synchronous nested provider context (#66) now has
+[bounded C# differential coverage](parity.md), with broader layout
 lifecycle in #47. The #61 source heads above remain frozen. Bounded typed request
 models and cooperative cancellation are documented in
 [request-context.md](request-context.md); automatic completed-slice threshold

@@ -2,3 +2,5 @@
 crates/razor-slices/tests/renamed/target/
 Cargo.lock
 .DS_Store
+/tests/parity/bin/
+/tests/parity/obj/

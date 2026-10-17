@@ -1,0 +1,4 @@
+document: <top><outer><inner>page-header:page</inner>|inner-footer[page-header]|inner-footer[page-header]</outer>|outer-banner{inner-footer[page-header]}</top>
+partial: page
+section-renders: header=4,footer=3,banner=1
+empty-name: rejected

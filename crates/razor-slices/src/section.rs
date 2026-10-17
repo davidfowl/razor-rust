@@ -2,7 +2,7 @@
 
 use std::{fmt, io};
 
-use crate::{RenderError, Slice, WriteHtmlValue};
+use crate::{Layout, RenderError, Slice, WriteHtmlValue};
 
 /// A lazy named-section insertion for [`crate::html!`].
 ///
@@ -71,8 +71,9 @@ impl<S: Slice> WriteHtmlValue for Section<'_, S> {
 /// Associated content bypasses declared layouts, retaining explicit composition.
 ///
 /// Owns both slices (or their references) and the name. Empty names fail at
-/// construction with [`io::ErrorKind::InvalidInput`]. No `@section` syntax,
-/// implicit layout discovery or automatic nested-layout context is introduced.
+/// construction with [`io::ErrorKind::InvalidInput`]. A layout body retains its
+/// [`Layout`] contract and supplies its own sections to outer layouts. No
+/// `@section` syntax or implicit layout discovery is introduced.
 ///
 /// ```
 /// use razor_slices::{html, with_section, Slice};
@@ -103,7 +104,7 @@ impl<S: Slice> WriteHtmlValue for Section<'_, S> {
 /// }
 /// let _ = body.render_to_string();
 /// ```
-pub fn with_section<S: Slice, T: Slice>(body: S, name: &str, content: T) -> io::Result<impl Slice> {
+pub fn with_section<S, T: Slice>(body: S, name: &str, content: T) -> io::Result<Sectioned<S, T>> {
     validate_name(name)?;
     let name = name.to_owned();
     Ok(Sectioned {
@@ -113,7 +114,11 @@ pub fn with_section<S: Slice, T: Slice>(body: S, name: &str, content: T) -> io::
     })
 }
 
-struct Sectioned<S, T> {
+/// A lazy section association retaining its body's slice or layout contract.
+///
+/// Construct with [`with_section`]. Layout associations provide their own
+/// sections to outer layouts, not an automatic search of their supplied body.
+pub struct Sectioned<S, T> {
     body: S,
     name: String,
     content: T,
@@ -147,6 +152,26 @@ impl<S: Slice, T: Slice> Slice for Sectioned<S, T> {
 
     fn render_to_bytes(&self) -> Result<Vec<u8>, RenderError> {
         self.body.render_to_bytes()
+    }
+}
+
+impl<S: Layout, T: Slice> Layout for Sectioned<S, T> {
+    fn render_layout(&self, body: &dyn Slice, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.body.render_layout(body, writer)
+    }
+
+    fn render_layout_section(
+        &self,
+        body: &dyn Slice,
+        name: &str,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<()> {
+        validate_name(name)?;
+        if name == self.name {
+            self.content.render_body_to_writer(writer)
+        } else {
+            self.body.render_layout_section(body, name, writer)
+        }
     }
 }
 

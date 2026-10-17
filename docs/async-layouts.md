@@ -3,8 +3,9 @@
 Bounded [#64](https://github.com/davidfowl/razor-rust/issues/64) /
 [PR #65](https://github.com/davidfowl/razor-rust/pull/65) under
 [#47](https://github.com/davidfowl/razor-rust/issues/47), #4/#11. This source
-is based on frozen, Ready/unmerged integration #61 at
-`7b6a8aeac067a06f64eae656a79ccdea5b035619`; it is not main or a released port.
+was originally based on frozen integration #61 at
+`7b6a8aeac067a06f64eae656a79ccdea5b035619`; those deliveries were consolidated
+into main through #75, not released.
 This consolidated source also includes async value work #62/#63, request
 scope #68 and automatic completed-slice flush #73; see the
 [source manifest](integration.md#exact-source-deliveries).
@@ -117,9 +118,9 @@ At pinned upstream
   reads its page's `lorem-header`, declares `_Layout`, and supplies its own
   `footer-links` to that outer layout.
 
-**Known gaps / follow-ups:** synchronous nested provider context is separately
-tracked in [#66](https://github.com/davidfowl/razor-rust/issues/66); it is not
-silently fixed or claimed here. #47/#11/#52 retain initialization/disposal,
+Synchronous nested provider context (#66) now has
+[bounded C# differential coverage](parity.md), using the analogous synchronous hook.
+**Known gaps / follow-ups:** #47/#11/#52 retain initialization/disposal,
 request tokens/context, native pipe completion/accounting and encoder-policy
 parity. #3 retains broader grammar/value parity; #62/#63 remains independently
 delivered. Async trait objects/local-only futures are not added. Fresh Rust
