@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="$(RazorSlicesSource)/src/RazorSlices/*.cs" Link="Upstream/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="RequirePinnedSource" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(RazorSlicesSource)/src/RazorSlices/RazorSlice.Write.cs')"
+           Text="Set RazorSlicesSource to DamianEdwards/RazorSlices at 552937e5f2f21ebcdc73939be014f3d217ffbb22." />
+    <Exec Command="git -C &quot;$(RazorSlicesSource)&quot; rev-parse HEAD" ConsoleToMSBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="ReferenceCommit" />
+    </Exec>
+    <Error Condition="'$(ReferenceCommit)' != '552937e5f2f21ebcdc73939be014f3d217ffbb22'"
+           Text="The reference checkout must be at the pinned commit." />
+    <Exec Command="git -C &quot;$(RazorSlicesSource)&quot; status --porcelain --untracked-files=all -- src/RazorSlices" ConsoleToMSBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="ReferenceChanges" />
+    </Exec>
+    <Error Condition="'$(ReferenceChanges)' != ''" Text="The pinned reference source must be clean." />
+  </Target>
+</Project>
