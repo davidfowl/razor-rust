@@ -1,0 +1,5 @@
+document: status=ok;output=OIHhPbi|FHhfooto;seams=outer-body,inner-body,page-header,header-child,page-body,bare-child,inner-footer,page-header,header-child,footer-child,inner-missing;tokens=same;trap=0
+bare: status=ok;output=Pb;seams=page-body,bare-child;tokens=same;trap=0
+section-cancel: status=cancelled;output=OIHhPbi|FHh;seams=outer-body,inner-body,page-header,header-child,page-body,bare-child,inner-footer,page-header,header-child;tokens=same;trap=0
+flush-cancel: status=cancelled;output=OIHhPbi|FHhfoot;seams=outer-body,inner-body,page-header,header-child,page-body,bare-child,inner-footer,page-header,header-child,footer-child;tokens=same;trap=0
+write-error: status=original-error;output=OIHhPbi|FHhf;seams=outer-body,inner-body,page-header,header-child,page-body,bare-child,inner-footer,page-header,header-child,footer-child;tokens=same;trap=0
