@@ -1,0 +1,5 @@
+boolean-empty: []
+boolean-values: [&amp;&lt;]
+binding-empty: []
+binding-values: [0:&amp;;1:&lt;;]
+nested: [0:&amp;01;1:&lt;01;]

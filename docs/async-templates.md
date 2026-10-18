@@ -49,6 +49,7 @@ Every body (including nested branches/loops) accepts:
 | `{ RustExpression }` | Evaluate and await typed `AsyncWriteHtmlValue` output |
 | `if condition { body } else if condition { body } else { body }` | Ordinary Rust conditional selection, including `if let` |
 | `for pattern in expression { body }` | Ordinary Rust iteration with scoped bindings |
+| `while condition { body }` or `while let pattern = expression { body }` | Re-evaluate the condition before each iteration; bindings remain scoped to that iteration |
 | `@{ Rust statements }` | Render-local bindings, application work and Rust awaits; bindings remain in the containing template scope |
 | `@await { future };` | Await a unit-returning application future |
 | `@await { future }?;` | Await a unit-result future and propagate its convertible error |
@@ -61,6 +62,10 @@ neither unused async values nor ignored `Result`s are silently discarded.
 For values, use `@{ let value = fetch(model).await?; }` followed by `{value}`,
 or `{fetch(model).await?}`. Normal Rust diagnostics still apply to code-block
 statements; the macro does not suppress must-use warnings.
+
+Condition-controlled loops recursively accept all existing body directives and
+await each write before advancing. Iterations introduce no implicit flush,
+yield or cancellation policy. See [bounded while-loop parity](while-loops.md).
 
 Code blocks keep preceding bindings available to later template parts.
 A semicolon-less tail such as `@{ let label = "<local>"; model.touch() }`

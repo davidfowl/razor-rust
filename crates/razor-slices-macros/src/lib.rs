@@ -29,6 +29,10 @@ enum Syntax {
 enum Part {
     Literal(LitStr),
     Value(Expr),
+    Match {
+        expression: Expr,
+        arms: Vec<MatchArm>,
+    },
     If {
         condition: Expr,
         body: Vec<Part>,
@@ -37,6 +41,10 @@ enum Part {
     For {
         pattern: Pat,
         iterator: Expr,
+        body: Vec<Part>,
+    },
+    While {
+        condition: Expr,
         body: Vec<Part>,
     },
     Code(Vec<Stmt>),
@@ -50,6 +58,12 @@ enum Part {
         provider: Expr,
         name: Expr,
     },
+}
+
+struct MatchArm {
+    pattern: Pat,
+    guard: Option<Expr>,
+    body: Vec<Part>,
 }
 
 struct Template {
@@ -71,6 +85,34 @@ fn parse_body(input: ParseStream<'_>, syntax: Syntax) -> Result<Vec<Part>> {
     let body;
     braced!(body in input);
     parse_parts(&body, syntax)
+}
+
+fn parse_match(input: ParseStream<'_>, syntax: Syntax) -> Result<Part> {
+    input.parse::<Token![match]>()?;
+    let expression = input.call(Expr::parse_without_eager_brace)?;
+    let content;
+    braced!(content in input);
+    let mut arms = Vec::new();
+    while !content.is_empty() {
+        let pattern = content.call(Pat::parse_multi_with_leading_vert)?;
+        let guard = if content.peek(Token![if]) {
+            content.parse::<Token![if]>()?;
+            Some(content.parse()?)
+        } else {
+            None
+        };
+        content.parse::<Token![=>]>()?;
+        let body = parse_body(&content, syntax)?;
+        arms.push(MatchArm {
+            pattern,
+            guard,
+            body,
+        });
+        if content.peek(Token![,]) {
+            content.parse::<Token![,]>()?;
+        }
+    }
+    Ok(Part::Match { expression, arms })
 }
 
 fn parse_if(input: ParseStream<'_>, syntax: Syntax) -> Result<Part> {
@@ -143,8 +185,12 @@ fn parse_parts(input: ParseStream<'_>, syntax: Syntax) -> Result<Vec<Part>> {
     while !input.is_empty() {
         if input.peek(LitStr) {
             parts.push(Part::Literal(input.parse()?));
+        } else if input.peek(Token![match]) {
+            parts.push(parse_match(input, syntax)?);
         } else if input.peek(syn::token::Brace) {
             parts.push(Part::Value(parse_expression(input)?));
+        } else if input.peek(Token![@]) && input.peek2(syn::token::Brace) {
+            parts.push(parse_directive(input)?);
         } else if input.peek(Token![if]) {
             parts.push(parse_if(input, syntax)?);
         } else if input.peek(Token![for]) {
@@ -158,10 +204,17 @@ fn parse_parts(input: ParseStream<'_>, syntax: Syntax) -> Result<Vec<Part>> {
                 iterator,
                 body,
             });
+        } else if input.peek(Token![while]) {
+            input.parse::<Token![while]>()?;
+            let condition = input.call(Expr::parse_without_eager_brace)?;
+            let body = parse_body(input, syntax)?;
+            parts.push(Part::While { condition, body });
         } else if matches!(syntax, Syntax::Async) && input.peek(Token![@]) {
             parts.push(parse_directive(input)?);
         } else {
-            return Err(input.error("expected a string literal, { Rust expression }, if, or for"));
+            return Err(
+                input.error("expected a string literal, { Rust expression }, if, for, or while")
+            );
         }
     }
     Ok(parts)
@@ -184,6 +237,19 @@ fn generate_parts(
             },
             Syntax::Async => quote! { #writer.write_html_value(&(#value)).await?; },
         },
+        Part::Match { expression, arms } => {
+            let arms = arms.into_iter().map(|arm| {
+                let MatchArm {
+                    pattern,
+                    guard,
+                    body,
+                } = arm;
+                let guard = guard.map(|guard| quote! { if #guard });
+                let body = generate_parts(body, runtime, writer, syntax);
+                quote! { #pattern #guard => { #body }, }
+            });
+            quote! { match #expression { #(#arms)* } }
+        }
         Part::If {
             condition,
             body,
@@ -200,6 +266,10 @@ fn generate_parts(
         } => {
             let body = generate_parts(body, runtime, writer, syntax);
             quote! { for #pattern in #iterator { #body } }
+        }
+        Part::While { condition, body } => {
+            let body = generate_parts(body, runtime, writer, syntax);
+            quote! { while #condition { #body } }
         }
         Part::Code(statements) => {
             let statements = statements.into_iter().map(|statement| match statement {
@@ -366,6 +436,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn match_arms_share_recursive_bodies_and_rust_patterns() {
+        for body in [
+            "match value {}",
+            r#"match value { | Some(1 | 2) => { "pair" }, _ => {} }"#,
+            r#"match value { Some(bound) if check(bound) => { {bound} } None => {} }"#,
+            r#"for value in values { match value { _ => { if true { {value} } } } }"#,
+            r#"match value { _ => { match other { _ => { "nested" } } } }"#,
+        ] {
+            assert!(syn::parse_str::<Template>(&format!("(runtime) {body}")).is_ok());
+            assert!(syn::parse_str::<AsyncTemplate>(&format!(
+                "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+            ))
+            .is_ok());
+        }
+        for body in [
+            r#"match value { _ => "unbraced" }"#,
+            r#"match value { _ { "missing arrow" } }"#,
+            "match value { _ if => {} }",
+            "match value { _ => {} ,, }",
+            "match value { _ => { unsupported } }",
+            "match value { _ => { @flush; } }",
+        ] {
+            assert!(syn::parse_str::<Template>(&format!("(runtime) {body}")).is_err());
+        }
+        assert!(syn::parse_str::<AsyncTemplate>(
+            "(runtime) struct Page { model: () } => { match model { _ => { @flush; } } }"
+        )
+        .is_ok());
+    }
+
+    #[test]
     fn writer_type_names_avoid_nested_and_raw_identifiers() {
         assert_eq!(writer_type_name(quote! {}), "__RazorWriter");
         assert_eq!(
@@ -387,6 +488,46 @@ mod tests {
             syn::parse_str(r#"(runtime) "<p>" {name} {1 + 2} r"</p>""#).unwrap();
         assert_eq!(template.parts.len(), 4);
         assert!(syn::parse_str::<Template>("(runtime)").is_ok());
+    }
+
+    #[test]
+    fn synchronous_blocks_reuse_scoped_statement_parsing() {
+        for body in [
+            "@{}",
+            r#"@{ let value = "local"; touch() } {value}"#,
+            r#"if true { @{ let value = "branch"; } {value} }"#,
+            r#"for value in &values { @{ let local = value; } {local} }"#,
+            "@{ let mut total = 0; } @{ total += 1; } {total}",
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_ok(),
+                "{body}"
+            );
+            assert!(
+                syn::parse_str::<AsyncTemplate>(&format!(
+                    "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+                ))
+                .is_ok(),
+                "{body}"
+            );
+        }
+    }
+
+    #[test]
+    fn synchronous_blocks_do_not_enable_async_only_directives() {
+        for body in [
+            "@flush;",
+            "@await { work() };",
+            "@render { child };",
+            r#"@section { provider }, { "header" };"#,
+            "@{ let value = ; }",
+            "@{};",
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_err(),
+                "{body}"
+            );
+        }
     }
 
     #[test]
@@ -430,6 +571,69 @@ mod tests {
             "(runtime) for item in items {} else {}",
         ] {
             assert!(syn::parse_str::<Template>(input).is_err(), "{input}");
+        }
+    }
+
+    #[test]
+    fn parses_condition_controlled_loops_in_both_template_forms() {
+        for body in [
+            r#"while enabled() { "body" }"#,
+            r#"while let Some((key, value)) = next() { {key} {value} }"#,
+            r#"for item in &items { while item.pending() { if true { {item} } } }"#,
+            r#"while (Options { enabled: true }).enabled {}"#,
+            r#"while false { while let Some(value) = next() { {value} } }"#,
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_ok(),
+                "{body}"
+            );
+            assert!(
+                syn::parse_str::<AsyncTemplate>(&format!(
+                    "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+                ))
+                .is_ok(),
+                "{body}"
+            );
+        }
+        assert!(syn::parse_str::<AsyncTemplate>(
+            r#"(runtime) struct Page { model: () } => {
+                while pending() {
+                    @{ let value = work().await?; }
+                    @await { ready() };
+                    @flush;
+                    @render { child };
+                    @section { provider }, { "header" };
+                    {value}
+                }
+            }"#
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn rejects_malformed_or_unsupported_loop_syntax() {
+        for body in [
+            "while {}",
+            "while true",
+            "while let = next() {}",
+            "while let Some(value) next() {}",
+            "while true { 42 }",
+            "while false {} else {}",
+            "while false { break; }",
+            "while false { continue; }",
+            "'label: while false {}",
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_err(),
+                "{body}"
+            );
+            assert!(
+                syn::parse_str::<AsyncTemplate>(&format!(
+                    "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+                ))
+                .is_err(),
+                "{body}"
+            );
         }
     }
 

@@ -1,0 +1,2 @@
+@inherits SwitchSlice
+@("A")@switch(Effects.Select()){case 0:<b>@Effects.Touch("zero")</b>break;case 1:case 2:<i>@Effects.Touch("pair"):@Effects.Value</i>break;case var value when Effects.Guard(value):<u>@Effects.Touch("guard"):@value</u>break;default:<em>@Effects.Touch("fallback")</em>break;}Z

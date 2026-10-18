@@ -49,19 +49,25 @@ pub use razor_slices_macros::async_template as __async_template;
 /// where clauses are ordinary Rust. The model must be `Sync`, and all awaited
 /// work must produce a `Send` render future.
 ///
+/// Template-level `match` uses the same braced arms as [`html!`]; selected
+/// arms may also contain the async directives below.
+///
 /// String literals are trusted markup; `{ expression }` uses the bounded typed
 /// [`AsyncWriteHtmlValue`] path: escaped strings, primitives, explicit trusted
 /// [`HtmlString`], optional values and validated [`attribute()`] adapters. `None`
-/// writes nothing; `Some` borrows/delegates to its contained value. Nested `if`/`for`
-/// use the same grammar as [`html!`]. Async-only directives:
+/// writes nothing; `Some` borrows/delegates to its contained value. Nested
+/// `if`/`for`/`while` (including `while let`) use the same grammar as [`html!`].
+/// Async-only directives:
 ///
-/// - `@{ Rust statements }` introduces render-local bindings/work (including await).
 /// - `@await { future };` awaits unit output; `@await { future }?;` propagates
 ///   errors from a unit-result future. Value-producing awaits use Rust bindings.
 /// - `@flush;` awaits an explicit flush at that insertion point.
 /// - `@render { child };` executes a bare async child on the same writer,
 ///   bypassing declared layouts but retaining explicit composition.
 /// - `@section { provider }, { name };` inserts an explicit lazy async section.
+///
+/// `@{ Rust statements }` introduces render-local bindings/work in both macros;
+/// Rust awaits are supported only in the asynchronous template.
 ///
 /// No directive implicitly buffers or spawns. Successful children check the
 /// sink's automatic completion-flush policy; [`render_incremental`] additionally
@@ -91,16 +97,28 @@ macro_rules! async_template {
 
 /// Creates a reusable synchronous [`Slice`] from literal markup and values.
 ///
+/// `match expression { pattern [if guard] => { template body }, ... }`
+/// streams only the selected arm using native Rust patterns, guards, scoping
+/// and exhaustiveness checks. See `docs/template-match.md`.
+///
 /// String literals (including raw strings) are written verbatim. Each
 /// `{ expression }` must implement [`WriteHtmlValue`]: strings are escaped,
 /// primitives formatted, and [`HtmlString`] emitted as trusted HTML. [`Option`]
 /// omits `None` and delegates `Some` without consuming its value.
+/// Nested `if`, `for`, `while` and `while let` bodies use ordinary Rust
+/// conditions and scoped bindings; conditions are evaluated during rendering.
 ///
 /// Captures use Rust's `move` closure rules. Expressions run on each render,
 /// not at construction; they must not consume or mutably borrow captures
 /// (the renderer implements `Fn`, not `FnOnce` or `FnMut`). Borrowed captures
 /// cannot outlive their referents. See the crate's `examples/inline.rs` and
 /// `INLINE.md` for the initial grammar and limitations.
+///
+/// `@{ Rust statements }` declares render-local bindings and work, including
+/// mutable locals used by later template parts. Unit-valued tails retain the
+/// preceding bindings; non-unit tails are rejected. Locals are recreated on
+/// every render. Async-only directives and Rust awaits remain unsupported here.
+/// See `docs/sync-code-blocks.md` for scope and reference evidence.
 ///
 /// ```
 /// use razor_slices::{html, HtmlString, Slice};
