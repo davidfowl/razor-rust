@@ -15,6 +15,8 @@ use crate::HtmlString;
 /// retaining the contained value's encoding, formatting and failure behavior.
 /// A `char` uses a four-byte UTF-8 stack buffer and the existing string path;
 /// it is a Unicode scalar, not a C# UTF-16 code unit.
+/// Byte slices, arrays and vectors use replacement UTF-8 decoding and the same
+/// string encoder, with no full-value decoding allocation.
 ///
 /// Custom implementations must await writes, preserve errors and supply a
 /// `Send` future. Encoding/trust and bounded-memory behavior are their explicit
@@ -73,6 +75,36 @@ impl AsyncWriteHtmlValue for String {
         output: &mut AsyncHtmlWriter<'_, W>,
     ) -> io::Result<()> {
         self.as_str().write_html_async(output).await
+    }
+}
+
+impl AsyncWriteHtmlValue for [u8] {
+    async fn write_html_async<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> io::Result<()> {
+        for text in crate::html::utf8_lossy_chunks(self) {
+            output.write_value(text).await?;
+        }
+        Ok(())
+    }
+}
+
+impl<const N: usize> AsyncWriteHtmlValue for [u8; N] {
+    async fn write_html_async<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> io::Result<()> {
+        self.as_slice().write_html_async(output).await
+    }
+}
+
+impl AsyncWriteHtmlValue for Vec<u8> {
+    async fn write_html_async<W: AsyncSliceWriter + Send>(
+        &self,
+        output: &mut AsyncHtmlWriter<'_, W>,
+    ) -> io::Result<()> {
+        self.as_slice().write_html_async(output).await
     }
 }
 
