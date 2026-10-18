@@ -1,7 +1,12 @@
 # Request-scoped incremental rendering
 
-Bounded follow-up to #52/#11, based on Ready/unmerged #63 at
-`43056c1cc10f96c92cdfd0c04aeec42b745024c3`. This is not landed runtime parity.
+This bounded request-scope implementation from
+[PR #68](https://github.com/davidfowl/razor-rust/pull/68) landed on main through
+[PR #75](https://github.com/davidfowl/razor-rust/pull/75), merged on 2026-10-17.
+Its original base was #63 at `43056c1cc10f96c92cdfd0c04aeec42b745024c3`;
+both source PRs are now closed without individual merges. The delivered
+cooperative cancellation and explicit typed request data do not complete
+broader #52/#11 runtime parity.
 
 ## Approach
 
@@ -14,9 +19,9 @@ Bounded follow-up to #52/#11, based on Ready/unmerged #63 at
   and distinguish portable cancellation from HTTP transport/body-drop behavior.
 - Verify held awaits, pending writes, isolation, repeated renders and exact output.
 
-Async declared layout dispatch remains the independent #47/#65 delivery.
-Automatic service injection, a portable response-start API and broader lifetime
-parity remain outside this milestone.
+Async declared layout dispatch from #65 also landed through #75. Broader
+layout/lifetime parity remains under #47; automatic service injection and a
+portable response-start API remain outside this milestone under #52/#11.
 
 ## Portable contract
 
@@ -138,11 +143,14 @@ completion flushing. That opt-out does not disable scoped explicit/final flushes
 ## Known gaps / follow-ups
 
 - [#69](https://github.com/davidfowl/razor-rust/issues/69) tracks broader
-  request-scope/declared-layout acceptance. This consolidation includes both
-  #68 and #65 through #73. Added regressions exercise repeated generated nested
+  request-scope/declared-layout acceptance. Merged #75 includes both #68 and
+  #65. Its regressions exercise repeated generated nested
   layouts, cancellation inside a held child section, shared threshold accounting
-  and cancellation during an automatic flush. That bounded coverage does not
-  claim the entire #69 acceptance scope.
+  and cancellation during an automatic flush. Further tests-only acceptance in
+  [PR #85](https://github.com/davidfowl/razor-rust/pull/85) is ready for review
+  but remains unmerged at `c8dbc2790d2fd625dcd09cfaca0f4b015d214a3e`.
+  #69 remains open; neither the landed bounded coverage nor that pending PR
+  claims full lifecycle parity.
 - #52 retains automatic HTTP request metadata/service association and portable
   response start; generic request data is explicit in this milestone.
 - #11 retains native writer completion/cancellation flags, full TextWriter
