@@ -12,6 +12,9 @@ rendering — without pulling in a full web/MVC framework.
 > are consolidated here with request scope #68, automatic flush #73 and the
 > accepted inline-codegen decision #29. These deliveries were merged to main
 > through [PR #75](https://github.com/davidfowl/razor-rust/pull/75), not released.
+> Later bounded lifecycle, root-policy, cancellation, grammar and value
+> increments landed through [PR #91](https://github.com/davidfowl/razor-rust/pull/91)
+> and [PR #94](https://github.com/davidfowl/razor-rust/pull/94).
 > The [source-pinned parity matrix](docs/parity.md) distinguishes verified
 > behavior from implemented features and remaining gaps.
 > See [#1](https://github.com/davidfowl/razor-rust/issues/1) for the live roadmap.
@@ -19,7 +22,9 @@ rendering — without pulling in a full web/MVC framework.
 ## What works today
 
 - Reusable inline `html!` templates with compile-time checked values, nested
-  conditionals/loops and HTML encoding. Typed Rust factories accept borrowed
+  conditionals/loops, [while/while-let](docs/while-loops.md),
+  [streamed match arms](docs/template-match.md), [render-local code blocks](docs/sync-code-blocks.md)
+  and HTML encoding. Typed Rust factories accept borrowed
   or owned models; `Slice` also remains hand-implementable.
 - Direct synchronous text/byte output, lazy partials, explicit or declared
   layouts, optional named sections and conditional attributes. Declared
@@ -47,9 +52,14 @@ rendering — without pulling in a full web/MVC framework.
   Sinks may opt into native `unflushed_bytes()` snapshots, including prebuffered
   or partially accepted output, without changing the default fallback.
   TextWriter-like sinks may disable completion flushes with
-  `auto_flush_enabled() -> false`; explicit and root-final flushes still run.
+  `auto_flush_enabled() -> false`; explicit flushes and default root-final
+  flushes still run.
   [Exact C# accounting cases and remaining #74 scope](docs/parity.md#native-byte-accounting-74)
   distinguish byte-count fidelity from native flush-result flags.
+  Raw adapters can separately opt out of unconditional root flushing with
+  `always_flush_on_root_completion() -> false`; the
+  [66-case root-policy evidence](docs/root-flush-policy.md) does not change
+  built-in transport defaults or establish full native lifecycle parity.
 - Axum adapters for atomic buffered HTML responses and bounded incremental
   streaming responses, with runnable servers and real HTTP/1 regressions
   for prefix delivery, peer-disconnect cancellation and post-start failures.
@@ -59,6 +69,10 @@ rendering — without pulling in a full web/MVC framework.
   without consuming, re-encoding or flushing its value.
   Character bodies/attributes reuse the string encoder; they do not change
   Unicode policy or existing boolean/float formatting. See [bounded C# evidence](docs/parity.md#character-values-and-primitive-outcomes-79).
+  [UTF-8 byte-buffer bodies](docs/utf8-values.md) reuse that encoder after
+  replacement decoding. Synchronous templates also accept explicit
+  [`format_args!` values](docs/formatted-values.md); incremental async formatting
+  arguments and .NET culture/provider parity remain unsupported.
   Built-ins use fixed encoding/format scratch; custom values must explicitly
   implement `AsyncWriteHtmlValue`, not just `Display` or `WriteHtmlValue`.
 - Opt-in typed, borrowed request models and cooperative cancellation scopes.
@@ -150,22 +164,29 @@ is open. Servers run locally; no hosted preview or deployment is provided.
   [PR #59](https://github.com/davidfowl/razor-rust/pull/59) are included here;
   [focused value parity #62](https://github.com/davidfowl/razor-rust/issues/62) /
   [PR #63](https://github.com/davidfowl/razor-rust/pull/63) adds existing built-in
-  values and conditional attributes. Custom Display/date formatting and broader
-  encoder policy remain outside this bounded milestone.
+  values and conditional attributes. Later grammar, byte-buffer and explicit
+  synchronous formatting increments are indexed in the [parity matrix](docs/parity.md).
+  Unwrapped custom `Display`, date/culture/provider equivalence and broader
+  encoder policy remain outside these bounded deliveries.
 - [#47](https://github.com/davidfowl/razor-rust/issues/47): broader layout
   lifecycle parity. [Synchronous nested provider context #66](https://github.com/davidfowl/razor-rust/issues/66)
   has bounded [C# differential evidence](docs/parity.md).
   Typed async declarations/context from [#64 / PR #65](https://github.com/davidfowl/razor-rust/pull/65)
   are included in the consolidated source.
+  [Inherited async-section lifecycle evidence](docs/async-section-lifecycle.md)
+  covers common output, render-local cleanup, cooperative cancellation and reuse,
+  not managed initialization/disposal or framework-owned lifetimes.
 - [#11](https://github.com/davidfowl/razor-rust/issues/11) /
   [#52](https://github.com/davidfowl/razor-rust/issues/52): remaining request
   metadata/service injection, portable response-start, lifecycle/flush and
   encoder-policy parity. Bounded request models/tokens are covered by
   [#67](https://github.com/davidfowl/razor-rust/issues/67); automatic completed-slice
   flush from [#72](https://github.com/davidfowl/razor-rust/issues/72) is included.
-  This consolidation combines the request and declared-layout sources; the
-  broader acceptance scope of [#69](https://github.com/davidfowl/razor-rust/issues/69)
-  remains separate.
+  [Combined request/layout acceptance](docs/combined-request-cancellation.md)
+  now verifies token identity and cooperative cancellation at the assembled
+  stack's seams, plus Rust-only partially accepted pending writes.
+  [#69](https://github.com/davidfowl/razor-rust/issues/69) and full lifecycle
+  parity remain open; raw-root policy evidence is not HTTP/framework equivalence.
 - [#8](https://github.com/davidfowl/razor-rust/issues/8): broader samples and
   comparable benchmarks. Integration success is not complete .NET parity.
 
