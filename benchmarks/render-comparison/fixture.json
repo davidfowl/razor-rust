@@ -1,0 +1,10 @@
+{
+  "title": "Parts & stock",
+  "repeat": 4,
+  "items": [
+    { "name": "Widget <small>", "detail": "Stock > request" },
+    { "name": "Nut & bolt", "detail": "Ready to ship" },
+    { "name": "Bracket", "detail": "Use <care> & gloves" },
+    { "name": "Washer", "detail": "In stock" }
+  ]
+}
