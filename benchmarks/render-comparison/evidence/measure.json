@@ -1,0 +1,504 @@
+{
+  "timestamp_utc": "2026-10-18T21:57:28.065691+00:00",
+  "source_head": "8935b90795297ac3e20a0cf470c4aadc25d85a4f",
+  "source_status": "",
+  "upstream_commit": "552937e5f2f21ebcdc73939be014f3d217ffbb22",
+  "mode": "measure",
+  "profile": "release",
+  "protocol": {
+    "warmup": 1000,
+    "samples": 5,
+    "iterations": 5000
+  },
+  "fixture_sha256": "674c5f07c9904dbd9136f34d69b1d16c4403535765daf91a79eb6536b209ee77",
+  "expected_sha256": "d1d94df8149f03d8bdb7c968700a3cc2bba1e8b48953248bab53990feb1aac92",
+  "cargo_lock_sha256": "1ba0fb3590ee30812e25bca45def866785a430d558a47216bf1db9d1de416d20",
+  "harness_sha256": {
+    "Cargo.toml": "87fabb77a10c465eb48dabbd8d19e3bad03fe2813dc53cd22684fa623e77fad7",
+    "askama-list.html": "31d82c68959f469cccb4378f9dd0875544446cc45523b284e5e7f4b80b77ae4e",
+    "askama.toml": "b28668585fcbf7774254518add0039d7c92463a462cedd9a01f0bccac39666cc",
+    "csharp/List.cshtml": "c0dea5357c85ee444a2ab6115a6c7812c8c3682a0e83d0123692e0fa2a4ebc1b",
+    "csharp/Program.cs": "c468dd1caae875b69b3ad310e67ec2ef17bd978ea48ff4dacfb0cee8934cd1c3",
+    "csharp/RenderComparison.csproj": "e7a32321e25cc66d80a11d82de0a0cea3d8766531406fe50b579c0d853f45d0f",
+    "csharp/global.json": "30fdf1d1d5cfadd6447ab39d18cc5eec405cf1a5ec5b2e4b1d228a6fe757846d",
+    "expected.html": "d1d94df8149f03d8bdb7c968700a3cc2bba1e8b48953248bab53990feb1aac92",
+    "fixture.json": "674c5f07c9904dbd9136f34d69b1d16c4403535765daf91a79eb6536b209ee77",
+    "list.html": "53e9967c28ba4b9771e3c7dffb84fa3ce615de2816bab2348fbe5c8c7a275e60",
+    "run.py": "5a01aa0506cf4f82577b66f772bcffefd61c23db48f863524e8efcc5ce447b60",
+    "src/main.rs": "7e6cb3f82abc48c426ca8475a546fdef316eb7c4812c954f7ffa976c2aff4a11"
+  },
+  "versions": {
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "packages": "render-comparison v0.1.0 (/root/copilot-worktrees/render-comparison-9dae6cda/benchmarks/render-comparison)\naskama v0.12.1\naskama_derive v0.12.5 (proc-macro)\naskama_parser v0.2.1\nnom v7.1.3\nmemchr v2.8.3\nminimal-lexical v0.2.1\nbasic-toml v0.1.10\nserde v1.0.197\nserde_derive v1.0.197 (proc-macro)\nproc-macro2 v1.0.107\nunicode-ident v1.0.27\nquote v1.0.47\nproc-macro2 v1.0.107 (*)\nsyn v2.0.119\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nunicode-ident v1.0.27\nmime v0.3.17\nmime_guess v2.0.5\nmime v0.3.17\nunicase v2.10.0\nunicase v2.10.0\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nserde v1.0.197 (*)\nsyn v2.0.119 (*)\naskama_escape v0.10.3\nhumansize v2.1.3\nlibm v0.2.16\nnum-traits v0.2.19\nautocfg v1.5.1\npercent-encoding v2.3.2\nmaud v0.26.0\nitoa v1.0.18\nmaud_macros v0.26.0 (proc-macro)\nproc-macro-error v1.0.4\nproc-macro-error-attr v1.0.4 (proc-macro)\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nversion_check v0.9.5\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nversion_check v0.9.5\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nsyn v2.0.119 (*)\nrazor-slices v0.1.0 (/root/copilot-worktrees/render-comparison-9dae6cda/crates/razor-slices)\nmemchr v2.8.3\nrazor-slices-macros v0.1.0 (proc-macro) (/root/copilot-worktrees/render-comparison-9dae6cda/crates/razor-slices-macros)\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nsyn v2.0.119 (*)\nserde v1.0.197 (*)\nserde_json v1.0.114\nitoa v1.0.18\nryu v1.0.23\nserde v1.0.197 (*)\ntera v1.19.1\nglobwalk v0.8.1\nbitflags v1.3.2\nignore v0.4.22\ncrossbeam-deque v0.8.8\ncrossbeam-epoch v0.9.21\ncrossbeam-utils v0.8.23\ncrossbeam-utils v0.8.23\nglobset v0.4.14\naho-corasick v1.1.5\nmemchr v2.8.3\nbstr v1.12.1\nmemchr v2.8.3\nlog v0.4.34\nregex-automata v0.4.18\naho-corasick v1.1.5 (*)\nmemchr v2.8.3\nregex-syntax v0.8.11\nregex-syntax v0.8.11\nlog v0.4.34\nmemchr v2.8.3\nregex-automata v0.4.18 (*)\nsame-file v1.0.6\nwalkdir v2.5.0\nsame-file v1.0.6\nwalkdir v2.5.0 (*)\nlazy_static v1.5.1\npest v2.8.0\nmemchr v2.8.3\nthiserror v2.0.17\nthiserror-impl v2.0.17 (proc-macro)\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nsyn v2.0.119 (*)\nucd-trie v0.1.7\npest_derive v2.8.0 (proc-macro)\npest v2.8.0 (*)\npest_generator v2.8.0\npest v2.8.0 (*)\npest_meta v2.8.0\nonce_cell v1.21.4\npest v2.8.0 (*)\nsha2 v0.10.9\ncfg-if v1.0.5\ncpufeatures v0.2.17\ndigest v0.10.7\nblock-buffer v0.10.4\ngeneric-array v0.14.7\ntypenum v1.20.1\nversion_check v0.9.5\ncrypto-common v0.1.7\ngeneric-array v0.14.7 (*)\ntypenum v1.20.1\nproc-macro2 v1.0.107 (*)\nquote v1.0.47 (*)\nsyn v2.0.119 (*)\nregex v1.13.1\naho-corasick v1.1.5 (*)\nmemchr v2.8.3\nregex-automata v0.4.18 (*)\nregex-syntax v0.8.11\nserde v1.0.197 (*)\nserde_json v1.0.114 (*)\nunic-segment v0.9.0\nunic-ucd-segment v0.9.0\nunic-char-property v0.9.0\nunic-char-range v0.9.0\nunic-char-range v0.9.0\nunic-ucd-version v0.9.0\nunic-common v0.9.0",
+    "dotnet": ".NET SDK:\n Version:           10.0.402\n Commit:            a8dd0577c5\n Workload version:  10.0.400-manifests.da132f47\n MSBuild version:   18.9.15+a8dd0577c\n\nRuntime Environment:\n OS Name:     ubuntu\n OS Version:  24.04\n OS Platform: Linux\n RID:         linux-x64\n Base Path:   /usr/share/dotnet/sdk/10.0.402/\n\n.NET workloads installed:\nThere are no installed workloads to display.\nConfigured to use workload sets when installing new manifests.\nNo workload sets are installed. Run \"dotnet workload restore\" to install a workload set.\n\nHost:\n  Version:      10.0.13\n  Architecture: x64\n  Commit:       4099f83977\n\n.NET SDKs installed:\n  10.0.402 [/usr/share/dotnet/sdk]\n\n.NET runtimes installed:\n  Microsoft.AspNetCore.App 10.0.13 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.NETCore.App 10.0.13 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n\nOther architectures found:\n  None\n\nEnvironment variables:\n  DOTNET_ROOT                              [/usr/share/dotnet]\n  DOTNET_RUNNING_IN_CONTAINER              [true]\n  DOTNET_SYSTEM_NET_DISABLEIPV6            [1]\n  DOTNET_USE_POLLING_FILE_WATCHER          [true]\n\nglobal.json file:\n  /root/copilot-worktrees/render-comparison-9dae6cda/benchmarks/render-comparison/csharp/global.json\n\nLearn more:\n  https://aka.ms/dotnet/info\n\nDownload .NET:\n  https://aka.ms/dotnet/download",
+    "csharp_compiler": "5.9.0-1.26505.111 (a8dd0577c5c13f43a2f57fe33b4ff11b90f6371e)",
+    "sdk_razor_compiler_sha256": "b99df70e4becfd35ec1e1eba4c058ca7f51891e30499f351f0e9ff62ff587cf4"
+  },
+  "generated_cshtml_sha256": {
+    "csharp/obj/generated/Microsoft.AspNetCore.App.SourceGenerators/Microsoft.AspNetCore.SourceGenerators.PublicProgramSourceGenerator/PublicTopLevelProgram.Generated.g.cs": "81ce1241cf364f7829ce3c506ca3331c12b1e9d0f9951f06c350009bef1200d7",
+    "csharp/obj/generated/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/List_cshtml.g.cs": "3345b14e1b2d57d7d0152dd9f6a3215fa641e1c4e5e6f880ba8cf35ab0c17470"
+  },
+  "environment": {
+    "platform": "Linux-6.12.8+-x86_64-with-glibc2.39",
+    "architecture": "x86_64",
+    "cpu_models": [
+      "AMD EPYC 9V74 80-Core Processor"
+    ],
+    "logical_cpus": 2,
+    "affinity_cpus": 2,
+    "meminfo": "MemTotal:        8379764 kB\nMemFree:         4114556 kB\nMemAvailable:    6697784 kB\nBuffers:           25860 kB\nCached:          2849308 kB\nSwapCached:            0 kB\nActive:          1251616 kB\nInactive:        2395244 kB\nActive(anon):      22388 kB\nInactive(anon):   856336 kB\nActive(file):    1229228 kB\nInactive(file):  1538908 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:             12880 kB\nWriteback:             0 kB\nAnonPages:        771816 kB\nMapped:           667628 kB\nShmem:            107048 kB\nKReclaimable:      74180 kB\nSlab:             101804 kB\nSReclaimable:      74180 kB\nSUnreclaim:        27624 kB\nKernelStack:        3632 kB\nPageTables:        10436 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:     4189880 kB\nCommitted_AS:    1866600 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:      407536 kB\nVmallocChunk:          0 kB\nPercpu:              608 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:       20480 kB\nDirectMap2M:     2338816 kB\nDirectMap1G:     7340032 kB\n",
+    "cgroup_cpu_max": null,
+    "cgroup_memory_max": null,
+    "runtime_overrides": {}
+  },
+  "gates": [
+    {
+      "engine": "razor-rust",
+      "equal": true,
+      "kind": "gate",
+      "output_bytes": 960
+    },
+    {
+      "engine": "askama",
+      "equal": true,
+      "kind": "gate",
+      "output_bytes": 960
+    },
+    {
+      "engine": "maud",
+      "equal": true,
+      "kind": "gate",
+      "output_bytes": 960
+    },
+    {
+      "engine": "tera",
+      "equal": true,
+      "kind": "gate",
+      "output_bytes": 960
+    },
+    {
+      "kind": "gate",
+      "engine": "razorslices-csharp",
+      "equal": true,
+      "output_bytes": 960
+    }
+  ],
+  "deliberate_mismatch_rejected": [
+    "askama",
+    "maud",
+    "razor-rust",
+    "razorslices-csharp",
+    "tera"
+  ],
+  "negative_controls": [
+    {
+      "engines": [
+        "askama",
+        "maud",
+        "razor-rust",
+        "tera"
+      ],
+      "exit_code": 1,
+      "stdout": "{\"engine\":\"razor-rust\",\"equal\":false,\"kind\":\"gate\",\"output_bytes\":979}\n{\"engine\":\"askama\",\"equal\":false,\"kind\":\"gate\",\"output_bytes\":979}\n{\"engine\":\"maud\",\"equal\":false,\"kind\":\"gate\",\"output_bytes\":979}\n{\"engine\":\"tera\",\"equal\":false,\"kind\":\"gate\",\"output_bytes\":979}\n",
+      "stderr": "output mismatch: razor-rust, attempt 1, expected 979 bytes, actual 960 bytes\noutput mismatch: razor-rust, attempt 2, expected 979 bytes, actual 960 bytes\noutput mismatch: askama, attempt 1, expected 979 bytes, actual 960 bytes\noutput mismatch: askama, attempt 2, expected 979 bytes, actual 960 bytes\noutput mismatch: maud, attempt 1, expected 979 bytes, actual 960 bytes\noutput mismatch: maud, attempt 2, expected 979 bytes, actual 960 bytes\noutput mismatch: tera, attempt 1, expected 979 bytes, actual 960 bytes\noutput mismatch: tera, attempt 2, expected 979 bytes, actual 960 bytes\nError: \"output equality gate failed; no measurements performed\"\n"
+    },
+    {
+      "engines": [
+        "razorslices-csharp"
+      ],
+      "exit_code": -6,
+      "stdout": "",
+      "stderr": "Unhandled exception. System.InvalidOperationException: output mismatch: razorslices-csharp, attempt 1, expected 979 bytes, actual 960 bytes; no measurements performed\n   at Program.<Main>$(String[] args) in /root/copilot-worktrees/render-comparison-9dae6cda/benchmarks/render-comparison/csharp/Program.cs:line 50\n"
+    }
+  ],
+  "rust_allocator_calibration": {
+    "passed": true,
+    "events": 3,
+    "requested_bytes": 224
+  },
+  "samples": [
+    {
+      "allocated_bytes": 10200000,
+      "allocated_bytes_per_render": 2040.0,
+      "allocation_events": 40000,
+      "allocation_events_per_render": 8.0,
+      "elapsed_ns": 13674654,
+      "engine": "razor-rust",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 365639.9642725878,
+      "sample": 0
+    },
+    {
+      "allocated_bytes": 10200000,
+      "allocated_bytes_per_render": 2040.0,
+      "allocation_events": 40000,
+      "allocation_events_per_render": 8.0,
+      "elapsed_ns": 13339505,
+      "engine": "razor-rust",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 374826.5021828021,
+      "sample": 1
+    },
+    {
+      "allocated_bytes": 10200000,
+      "allocated_bytes_per_render": 2040.0,
+      "allocation_events": 40000,
+      "allocation_events_per_render": 8.0,
+      "elapsed_ns": 13253748,
+      "engine": "razor-rust",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 377251.7781385311,
+      "sample": 2
+    },
+    {
+      "allocated_bytes": 10200000,
+      "allocated_bytes_per_render": 2040.0,
+      "allocation_events": 40000,
+      "allocation_events_per_render": 8.0,
+      "elapsed_ns": 13161590,
+      "engine": "razor-rust",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 379893.3107626054,
+      "sample": 3
+    },
+    {
+      "allocated_bytes": 10200000,
+      "allocated_bytes_per_render": 2040.0,
+      "allocation_events": 40000,
+      "allocation_events_per_render": 8.0,
+      "elapsed_ns": 13226506,
+      "engine": "razor-rust",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 378028.78553111455,
+      "sample": 4
+    },
+    {
+      "allocated_bytes": 11780000,
+      "allocated_bytes_per_render": 2356.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 6324708,
+      "engine": "askama",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 790550.3305449042,
+      "sample": 0
+    },
+    {
+      "allocated_bytes": 11780000,
+      "allocated_bytes_per_render": 2356.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 6383246,
+      "engine": "askama",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 783300.5339289759,
+      "sample": 1
+    },
+    {
+      "allocated_bytes": 11780000,
+      "allocated_bytes_per_render": 2356.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 6327663,
+      "engine": "askama",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 790181.1458669654,
+      "sample": 2
+    },
+    {
+      "allocated_bytes": 11780000,
+      "allocated_bytes_per_render": 2356.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 6321233,
+      "engine": "askama",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 790984.9233527699,
+      "sample": 3
+    },
+    {
+      "allocated_bytes": 11780000,
+      "allocated_bytes_per_render": 2356.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 6344298,
+      "engine": "askama",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 788109.2596848382,
+      "sample": 4
+    },
+    {
+      "allocated_bytes": 15190000,
+      "allocated_bytes_per_render": 3038.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 2565651,
+      "engine": "maud",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 1948823.1252029212,
+      "sample": 0
+    },
+    {
+      "allocated_bytes": 15190000,
+      "allocated_bytes_per_render": 3038.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 2569256,
+      "engine": "maud",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 1946088.673141174,
+      "sample": 1
+    },
+    {
+      "allocated_bytes": 15190000,
+      "allocated_bytes_per_render": 3038.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 2683807,
+      "engine": "maud",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 1863025.1728235302,
+      "sample": 2
+    },
+    {
+      "allocated_bytes": 15190000,
+      "allocated_bytes_per_render": 3038.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 2597117,
+      "engine": "maud",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 1925211.6866510059,
+      "sample": 3
+    },
+    {
+      "allocated_bytes": 15190000,
+      "allocated_bytes_per_render": 3038.0,
+      "allocation_events": 25000,
+      "allocation_events_per_render": 5.0,
+      "elapsed_ns": 2614433,
+      "engine": "maud",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 1912460.5602820953,
+      "sample": 4
+    },
+    {
+      "allocated_bytes": 25155000,
+      "allocated_bytes_per_render": 5031.0,
+      "allocation_events": 675000,
+      "allocation_events_per_render": 135.0,
+      "elapsed_ns": 33074724,
+      "engine": "tera",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 151172.84123066303,
+      "sample": 0
+    },
+    {
+      "allocated_bytes": 25155000,
+      "allocated_bytes_per_render": 5031.0,
+      "allocation_events": 675000,
+      "allocation_events_per_render": 135.0,
+      "elapsed_ns": 32490835,
+      "engine": "tera",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 153889.55069945107,
+      "sample": 1
+    },
+    {
+      "allocated_bytes": 25155000,
+      "allocated_bytes_per_render": 5031.0,
+      "allocation_events": 675000,
+      "allocation_events_per_render": 135.0,
+      "elapsed_ns": 32207763,
+      "engine": "tera",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 155242.076265899,
+      "sample": 2
+    },
+    {
+      "allocated_bytes": 25155000,
+      "allocated_bytes_per_render": 5031.0,
+      "allocation_events": 675000,
+      "allocation_events_per_render": 135.0,
+      "elapsed_ns": 32912081,
+      "engine": "tera",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 151919.89834978833,
+      "sample": 3
+    },
+    {
+      "allocated_bytes": 25155000,
+      "allocated_bytes_per_render": 5031.0,
+      "allocation_events": 675000,
+      "allocation_events_per_render": 135.0,
+      "elapsed_ns": 32399849,
+      "engine": "tera",
+      "iterations": 5000,
+      "kind": "sample",
+      "output_bytes": 960,
+      "renders_per_second": 154321.70686968326,
+      "sample": 4
+    },
+    {
+      "kind": "sample",
+      "engine": "razorslices-csharp",
+      "sample": 0,
+      "iterations": 5000,
+      "elapsed_ns": 40370300,
+      "renders_per_second": 123853.42690046891,
+      "output_bytes": 960,
+      "allocation_events": null,
+      "allocation_events_per_render": null,
+      "allocated_bytes": 23760000,
+      "allocated_bytes_per_render": 4752
+    },
+    {
+      "kind": "sample",
+      "engine": "razorslices-csharp",
+      "sample": 1,
+      "iterations": 5000,
+      "elapsed_ns": 43231600,
+      "renders_per_second": 115656.14041580695,
+      "output_bytes": 960,
+      "allocation_events": null,
+      "allocation_events_per_render": null,
+      "allocated_bytes": 23760000,
+      "allocated_bytes_per_render": 4752
+    },
+    {
+      "kind": "sample",
+      "engine": "razorslices-csharp",
+      "sample": 2,
+      "iterations": 5000,
+      "elapsed_ns": 33655100,
+      "renders_per_second": 148565.89343071333,
+      "output_bytes": 960,
+      "allocation_events": null,
+      "allocation_events_per_render": null,
+      "allocated_bytes": 23760000,
+      "allocated_bytes_per_render": 4752
+    },
+    {
+      "kind": "sample",
+      "engine": "razorslices-csharp",
+      "sample": 3,
+      "iterations": 5000,
+      "elapsed_ns": 63593800,
+      "renders_per_second": 78624.01680666982,
+      "output_bytes": 960,
+      "allocation_events": null,
+      "allocation_events_per_render": null,
+      "allocated_bytes": 23760000,
+      "allocated_bytes_per_render": 4752
+    },
+    {
+      "kind": "sample",
+      "engine": "razorslices-csharp",
+      "sample": 4,
+      "iterations": 5000,
+      "elapsed_ns": 37077900,
+      "renders_per_second": 134851.21865046295,
+      "output_bytes": 960,
+      "allocation_events": null,
+      "allocation_events_per_render": null,
+      "allocated_bytes": 23760000,
+      "allocated_bytes_per_render": 4752
+    }
+  ],
+  "summary": {
+    "askama": {
+      "median_renders_per_second": 790181.1458669654,
+      "median_allocated_bytes_per_render": 2356.0,
+      "allocation_events_per_render": [
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ]
+    },
+    "maud": {
+      "median_renders_per_second": 1925211.6866510059,
+      "median_allocated_bytes_per_render": 3038.0,
+      "allocation_events_per_render": [
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ]
+    },
+    "razor-rust": {
+      "median_renders_per_second": 377251.7781385311,
+      "median_allocated_bytes_per_render": 2040.0,
+      "allocation_events_per_render": [
+        8.0,
+        8.0,
+        8.0,
+        8.0,
+        8.0
+      ]
+    },
+    "razorslices-csharp": {
+      "median_renders_per_second": 123853.42690046891,
+      "median_allocated_bytes_per_render": 4752,
+      "allocation_events_per_render": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "tera": {
+      "median_renders_per_second": 153889.55069945107,
+      "median_allocated_bytes_per_render": 5031.0,
+      "allocation_events_per_render": [
+        135.0,
+        135.0,
+        135.0,
+        135.0,
+        135.0
+      ]
+    }
+  }
+}

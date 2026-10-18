@@ -136,7 +136,7 @@ There are no arbitrary performance pass/fail thresholds.
 [smoke 1](../benchmarks/render-comparison/evidence/smoke-1.json) /
 [smoke 2](../benchmarks/render-comparison/evidence/smoke-2.json) retain the raw
 results from clean source commit
-`2584e55728167ec93e6cdae5166abfa2c86e3d61`; the subsequent evidence commit
+`8935b90795297ac3e20a0cf470c4aadc25d85a4f`; the subsequent evidence commit
 only adds these artifacts and this documentation. All three invocations passed
 five exact **960-byte** gates and deliberate-mismatch rejection for all engines.
 Fixture SHA-256:
@@ -152,16 +152,16 @@ resources. Full version/environment details and all samples are in the JSON.
 
 | Engine | Median renders/s | Allocated bytes/render | Rust allocation requests/render |
 | --- | ---: | ---: | ---: |
-| razor-rust 0.1.0 (this source) | 371,250 | 2,040 | 8 |
-| Askama 0.12.1 | 730,112 | 2,356 | 5 |
-| Maud 0.26.0 | 1,939,941 | 3,038 | 5 |
-| Tera 1.19.1 | 150,789 | 5,031 | 135 |
-| C# RazorSlices 0.12.1 pinned runtime | 115,301 | 4,752 (managed) | not measured |
+| razor-rust 0.1.0 (this source) | 377,252 | 2,040 | 8 |
+| Askama 0.12.1 | 790,181 | 2,356 | 5 |
+| Maud 0.26.0 | 1,925,212 | 3,038 | 5 |
+| Tera 1.19.1 | 153,890 | 5,031 | 135 |
+| C# RazorSlices 0.12.1 pinned runtime | 123,853 | 4,752 (managed) | not measured |
 
 These are observations of **different materialization paths and allocation
 accounting**, not a ranking of the engines' general capabilities. C# throughput
-ranged from about 61,340 to 153,565 renders/s within this short run. Smoke timings
-are intentionally too short to interpret (including a visible Maud outlier);
+ranged from about 78,624 to 148,566 renders/s within this short run. Smoke timings
+are intentionally too short to interpret;
 neither outliers nor slower samples were discarded.
 
 Qualification commands, run in addition to the three recorded invocations:
