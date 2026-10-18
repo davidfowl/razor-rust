@@ -191,6 +191,8 @@ impl<const N: usize> fmt::Write for FixedBuf<N> {
 /// encoding/trust contract and original errors, without an implicit flush.
 /// Characters use a four-byte UTF-8 stack buffer and the existing string
 /// encoder, not raw markup or a separate Unicode/UTF-16 encoding policy.
+/// Byte slices, arrays and vectors decode UTF-8 with replacement for malformed
+/// sequences, then use the same string encoder without a full-value allocation.
 ///
 /// Optional values still require an explicitly supported contained type:
 ///
@@ -227,6 +229,50 @@ impl WriteHtmlValue for str {
 impl WriteHtmlValue for String {
     fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         encode_html_to_writer(self, writer)
+    }
+}
+
+pub(crate) fn utf8_lossy_chunks(mut bytes: &[u8]) -> impl Iterator<Item = &str> {
+    std::iter::from_fn(move || {
+        if bytes.is_empty() {
+            return None;
+        }
+        match std::str::from_utf8(bytes) {
+            Ok(text) => {
+                bytes = &[];
+                Some(text)
+            }
+            Err(error) if error.valid_up_to() > 0 => {
+                let (valid, rest) = bytes.split_at(error.valid_up_to());
+                bytes = rest;
+                Some(std::str::from_utf8(valid).expect("validated UTF-8 prefix"))
+            }
+            Err(error) => {
+                bytes = &bytes[error.error_len().unwrap_or(bytes.len())..];
+                Some("\u{fffd}")
+            }
+        }
+    })
+}
+
+impl WriteHtmlValue for [u8] {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        for text in utf8_lossy_chunks(self) {
+            encode_html_to_writer(text, writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl<const N: usize> WriteHtmlValue for [u8; N] {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.as_slice().write_html_to(writer)
+    }
+}
+
+impl WriteHtmlValue for Vec<u8> {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.as_slice().write_html_to(writer)
     }
 }
 
