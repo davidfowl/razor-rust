@@ -12,6 +12,7 @@ mod async_slice;
 mod attribute;
 mod html;
 mod inline;
+mod integer;
 mod layout;
 mod partial;
 mod section;
@@ -30,6 +31,7 @@ pub use attribute::{
 };
 pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
 pub use inline::InlineSlice;
+pub use integer::{format_integer, FormattedInteger, IntegerFormat};
 pub use layout::{declare_layout, with_layout, DeclaredLayout, Layout};
 pub use partial::{partial, Partial};
 pub use section::{section, with_section, Section, Sectioned};
