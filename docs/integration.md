@@ -1,31 +1,32 @@
 # Combined-source preview
 
-This consolidation includes all 23 open PRs targeting main at the source
-snapshot below. It starts from fresh main, merges #73 (including its existing
-stack), then #68, then independent documentation #29. Git ancestry preserves
-the original commits and authors without replaying stacked PRs. The prior
-empty direct-access test commit is not included. Source branches and PRs
-remain unchanged and open.
+This integration is implemented on main through
+[PR #75](https://github.com/davidfowl/razor-rust/pull/75), merged on
+2026-10-17 as
+[`db4bdaa`](https://github.com/davidfowl/razor-rust/commit/db4bdaa4be1477de753c961d2c1e4c4e788a9b06).
+It consolidated the 23 then-open source PRs listed below. Those PRs are now
+closed without individual merges; their deliveries landed through #75.
+The source-head table records that historical snapshot, not pending dependencies
+or the current main head.
 
 Focused [#60](https://github.com/davidfowl/razor-rust/issues/60),
-[PR #61](https://github.com/davidfowl/razor-rust/pull/61) assembles delivered
-feature branches without changing main or any source PR branch. They remain
-unmerged. Local merge commits assemble sources for verification; they do not
-authorize repository merges, publishing or deployment.
+[PR #61](https://github.com/davidfowl/razor-rust/pull/61) assembled the initial
+feature branches. The bounded
+[#70 / PR #71](https://github.com/davidfowl/razor-rust/pull/71) follow-up combined
+#63 generated async values and #65 typed nested async layouts from frozen #61.
+The [#67 / PR #68](https://github.com/davidfowl/razor-rust/pull/68) delivery added
+opt-in typed request models/cooperative tokens and Axum scope notification.
+#75 assembled #73's existing stack, #68 and independent documentation #29 on
+the then-current main `123e62dd695a2ec0fb4400f7a27179f6c6bc543d` before
+the consolidation was squash-merged.
 
-The bounded [#70 / PR #71](https://github.com/davidfowl/razor-rust/pull/71)
-follow-up combines the separately verified #63 generated async value and #65
-typed nested async layout deliveries. Both start from frozen #61.
-It targets main with all unmerged dependencies below; none of the source
-branches are modified. Main was refreshed at
-`123e62dd695a2ec0fb4400f7a27179f6c6bc543d`.
-
-The [#67 / PR #68](https://github.com/davidfowl/razor-rust/pull/68)
-request-scope follow-up starts from verified Ready/unmerged #63 at
-`43056c1cc10f96c92cdfd0c04aeec42b745024c3`. It adds opt-in typed request
-models/cooperative tokens and Axum scope notification without changing #63
-or frozen #61. This consolidation also includes #65 async layout dispatch
-through #73's existing ancestry; broader request/layout acceptance remains #69.
+Buffered/streaming Axum responses (#40/#51), real peer-disconnect acceptance
+(#55), and empty-prefix header commitment/post-start failure acceptance over
+HTTP/1 (#57) are included, not pending integration. These bounded deliveries
+do not complete [#6](https://github.com/davidfowl/razor-rust/issues/6) or
+[#52](https://github.com/davidfowl/razor-rust/issues/52), which remain open.
+Broader request/layout acceptance remains #69. This status correction adds no
+new runtime validation and does not claim full parity, release or deployment.
 
 ## Exact source deliveries
 
@@ -169,35 +170,38 @@ preview. Stable/MSRV CI runs the actual stdout fixture in addition to runtime
 and real HTTP tests. The original async-value and async-layout fixtures remain
 unchanged and executable.
 
-## Remaining work
+## Included follow-ups and remaining work
 
 Bounded [#72 / PR #73](https://github.com/davidfowl/razor-rust/pull/73)
-adds automatic 16,384-byte **completed-slice** flush to frozen #71 at
-`0e4c49a8e7cab4061d56964709fbd55bc6fb2788`. This consolidation additionally
-combines request scope #68; broader #69 acceptance is not claimed complete.
+added automatic 16,384-byte **completed-slice** flush to frozen #71 at
+`0e4c49a8e7cab4061d56964709fbd55bc6fb2788`. Both landed through #75 together
+with request scope #68; broader #69 acceptance is not claimed complete.
 The existing preview and its exact fixtures remain intact.
 See [automatic completion acceptance](async-rendering.md#automatic-completion-flush)
 for executable buffered-sink and real HTTP evidence and native-pipe limits.
 
-Typed generated async templates from verified Ready #58/#59 are included.
+Typed generated async templates from #58/#59 landed through #75.
 Focused [#62](https://github.com/davidfowl/razor-rust/issues/62) under #3/#2/#11
-adds bounded primitive, trusted-HTML and conditional attribute interpolation
-in this follow-up source. The generated mixed-value executable and real HTTP/1
+added bounded primitive, trusted-HTML and conditional attribute interpolation
+included in #75. The generated mixed-value executable and real HTTP/1
 test observe an exact prefix before releasing later application work.
 Custom synchronous values still require explicit async implementations.
 ADR reconciliation #28/#29 is included with its historical evidence. Current source
 instructions and README describe the assembled code, not historical
 scaffolding.
 
-This follow-up source adds typed async declarations and immediate-content
-layout/section context in [#64 / PR #65](https://github.com/davidfowl/razor-rust/pull/65);
+Typed async declarations and immediate-content layout/section context from
+[#64 / PR #65](https://github.com/davidfowl/razor-rust/pull/65) landed through #75;
 see [async-layouts.md](async-layouts.md) for exact full/partial output and its
 observable section handshake. Synchronous nested provider context (#66) now has
 [bounded C# differential coverage](parity.md), with broader layout
 lifecycle in #47. The #61 source heads above remain frozen. Bounded typed request
 models and cooperative cancellation are documented in
 [request-context.md](request-context.md); automatic completed-slice threshold
-flush is also included. Automatic request metadata/service injection, portable
-explicit response-start, native-pipe lifecycle/flush-result flags and broader encoder policy
-remain #52/#11. Proxy/HTTP2 behavior and complete .NET parity are not inferred
+flush is also included. Automatic request metadata/service injection and portable
+explicit response-start remain gaps under #52/#6/#11 despite the included
+HTTP/1 acceptance. Broader layout/request lifecycle, native-pipe lifecycle/
+flush-result flags and encoder policy remain #47/#52/#11. Actix-web integration
+remains outside the implemented Axum milestones under #6.
+Proxy/HTTP2 behavior and complete .NET parity are not inferred
 from local HTTP/1 tests. Broader benchmark parity remains #8.
