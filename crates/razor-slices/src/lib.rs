@@ -49,6 +49,9 @@ pub use razor_slices_macros::async_template as __async_template;
 /// where clauses are ordinary Rust. The model must be `Sync`, and all awaited
 /// work must produce a `Send` render future.
 ///
+/// Template-level `match` uses the same braced arms as [`html!`]; selected
+/// arms may also contain the async directives below.
+///
 /// String literals are trusted markup; `{ expression }` uses the bounded typed
 /// [`AsyncWriteHtmlValue`] path: escaped strings, primitives, explicit trusted
 /// [`HtmlString`], optional values and validated [`attribute()`] adapters. `None`
@@ -90,6 +93,10 @@ macro_rules! async_template {
 }
 
 /// Creates a reusable synchronous [`Slice`] from literal markup and values.
+///
+/// `match expression { pattern [if guard] => { template body }, ... }`
+/// streams only the selected arm using native Rust patterns, guards, scoping
+/// and exhaustiveness checks. See `docs/template-match.md`.
 ///
 /// String literals (including raw strings) are written verbatim. Each
 /// `{ expression }` must implement [`WriteHtmlValue`]: strings are escaped,
