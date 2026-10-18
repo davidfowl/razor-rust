@@ -29,6 +29,10 @@ enum Syntax {
 enum Part {
     Literal(LitStr),
     Value(Expr),
+    Match {
+        expression: Expr,
+        arms: Vec<MatchArm>,
+    },
     If {
         condition: Expr,
         body: Vec<Part>,
@@ -56,6 +60,12 @@ enum Part {
     },
 }
 
+struct MatchArm {
+    pattern: Pat,
+    guard: Option<Expr>,
+    body: Vec<Part>,
+}
+
 struct Template {
     runtime: proc_macro2::TokenStream,
     parts: Vec<Part>,
@@ -75,6 +85,34 @@ fn parse_body(input: ParseStream<'_>, syntax: Syntax) -> Result<Vec<Part>> {
     let body;
     braced!(body in input);
     parse_parts(&body, syntax)
+}
+
+fn parse_match(input: ParseStream<'_>, syntax: Syntax) -> Result<Part> {
+    input.parse::<Token![match]>()?;
+    let expression = input.call(Expr::parse_without_eager_brace)?;
+    let content;
+    braced!(content in input);
+    let mut arms = Vec::new();
+    while !content.is_empty() {
+        let pattern = content.call(Pat::parse_multi_with_leading_vert)?;
+        let guard = if content.peek(Token![if]) {
+            content.parse::<Token![if]>()?;
+            Some(content.parse()?)
+        } else {
+            None
+        };
+        content.parse::<Token![=>]>()?;
+        let body = parse_body(&content, syntax)?;
+        arms.push(MatchArm {
+            pattern,
+            guard,
+            body,
+        });
+        if content.peek(Token![,]) {
+            content.parse::<Token![,]>()?;
+        }
+    }
+    Ok(Part::Match { expression, arms })
 }
 
 fn parse_if(input: ParseStream<'_>, syntax: Syntax) -> Result<Part> {
@@ -147,6 +185,8 @@ fn parse_parts(input: ParseStream<'_>, syntax: Syntax) -> Result<Vec<Part>> {
     while !input.is_empty() {
         if input.peek(LitStr) {
             parts.push(Part::Literal(input.parse()?));
+        } else if input.peek(Token![match]) {
+            parts.push(parse_match(input, syntax)?);
         } else if input.peek(syn::token::Brace) {
             parts.push(Part::Value(parse_expression(input)?));
         } else if input.peek(Token![@]) && input.peek2(syn::token::Brace) {
@@ -197,6 +237,19 @@ fn generate_parts(
             },
             Syntax::Async => quote! { #writer.write_html_value(&(#value)).await?; },
         },
+        Part::Match { expression, arms } => {
+            let arms = arms.into_iter().map(|arm| {
+                let MatchArm {
+                    pattern,
+                    guard,
+                    body,
+                } = arm;
+                let guard = guard.map(|guard| quote! { if #guard });
+                let body = generate_parts(body, runtime, writer, syntax);
+                quote! { #pattern #guard => { #body }, }
+            });
+            quote! { match #expression { #(#arms)* } }
+        }
         Part::If {
             condition,
             body,
@@ -381,6 +434,37 @@ pub fn async_template(input: TokenStream) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn match_arms_share_recursive_bodies_and_rust_patterns() {
+        for body in [
+            "match value {}",
+            r#"match value { | Some(1 | 2) => { "pair" }, _ => {} }"#,
+            r#"match value { Some(bound) if check(bound) => { {bound} } None => {} }"#,
+            r#"for value in values { match value { _ => { if true { {value} } } } }"#,
+            r#"match value { _ => { match other { _ => { "nested" } } } }"#,
+        ] {
+            assert!(syn::parse_str::<Template>(&format!("(runtime) {body}")).is_ok());
+            assert!(syn::parse_str::<AsyncTemplate>(&format!(
+                "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+            ))
+            .is_ok());
+        }
+        for body in [
+            r#"match value { _ => "unbraced" }"#,
+            r#"match value { _ { "missing arrow" } }"#,
+            "match value { _ if => {} }",
+            "match value { _ => {} ,, }",
+            "match value { _ => { unsupported } }",
+            "match value { _ => { @flush; } }",
+        ] {
+            assert!(syn::parse_str::<Template>(&format!("(runtime) {body}")).is_err());
+        }
+        assert!(syn::parse_str::<AsyncTemplate>(
+            "(runtime) struct Page { model: () } => { match model { _ => { @flush; } } }"
+        )
+        .is_ok());
+    }
 
     #[test]
     fn writer_type_names_avoid_nested_and_raw_identifiers() {

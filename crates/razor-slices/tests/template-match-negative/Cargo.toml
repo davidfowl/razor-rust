@@ -1,0 +1,11 @@
+[package]
+name = "template-match-negative"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.75"
+publish = false
+
+[workspace]
+
+[dependencies]
+razor-slices = { path = "../.." }
