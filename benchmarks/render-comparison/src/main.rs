@@ -47,6 +47,39 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
+fn calibrate_allocator() -> Result<(), Box<dyn Error>> {
+    let initial = Layout::from_size_align(64, 8)?;
+    let grown = Layout::from_size_align(128, 8)?;
+    let zeroed = Layout::from_size_align(32, 8)?;
+    EVENTS.store(0, Relaxed);
+    BYTES.store(0, Relaxed);
+    COUNTING.store(true, Relaxed);
+    // Exercise all counted entry points with known sizes; keep pointers observable.
+    unsafe {
+        let pointer = black_box(std::alloc::alloc(initial));
+        if pointer.is_null() {
+            std::alloc::handle_alloc_error(initial);
+        }
+        let resized = black_box(std::alloc::realloc(pointer, initial, grown.size()));
+        if resized.is_null() {
+            std::alloc::handle_alloc_error(grown);
+        }
+        let cleared = black_box(std::alloc::alloc_zeroed(zeroed));
+        if cleared.is_null() {
+            std::alloc::handle_alloc_error(zeroed);
+        }
+        std::alloc::dealloc(resized, grown);
+        std::alloc::dealloc(cleared, zeroed);
+    }
+    COUNTING.store(false, Relaxed);
+    if EVENTS.load(Relaxed) != 3 || BYTES.load(Relaxed) != 224 {
+        return Err(
+            "allocator calibration failed: expected 3 events and 224 requested bytes".into(),
+        );
+    }
+    Ok(())
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 struct Item {
     name: String,
@@ -61,7 +94,7 @@ struct Fixture {
 }
 
 #[derive(Template)]
-#[template(path = "list.html", escape = "html")]
+#[template(path = "askama-list.html", escape = "html")]
 struct AskamaList<'a> {
     title: &'a str,
     items: &'a [Item],
@@ -80,6 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if cfg!(debug_assertions) {
         return Err("use cargo build --release; debug measurements are forbidden".into());
     }
+    calibrate_allocator()?;
     let fixture: Fixture = serde_json::from_slice(&std::fs::read(&args[2])?)?;
     if fixture.repeat == 0 || fixture.repeat > 1024 || fixture.items.is_empty() {
         return Err("fixture must have items and repeat in 1..=1024".into());

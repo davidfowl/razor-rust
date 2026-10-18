@@ -3,3 +3,4 @@
 /csharp/obj/
 /results/
 /__pycache__/
+!/Cargo.lock

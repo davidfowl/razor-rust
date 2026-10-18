@@ -83,6 +83,7 @@ def main():
         raise RuntimeError("missing or failed cross-framework equality gate")
 
     rejections = []
+    rejection_results = []
     if args.verify_rejection:
         with tempfile.TemporaryDirectory(prefix="render-comparison-") as directory:
             wrong = Path(directory) / "wrong.html"
@@ -95,6 +96,10 @@ def main():
                 if not rejected:
                     raise RuntimeError("negative control failed for an unrelated reason:\n" + result.stderr)
                 rejections.extend(rejected)
+                rejection_results.append({
+                    "engines": sorted(rejected), "exit_code": result.returncode,
+                    "stdout": result.stdout, "stderr": result.stderr,
+                })
             if set(rejections) != ENGINES:
                 raise RuntimeError("not all engines rejected the corrupt expected bytes")
 
@@ -131,7 +136,16 @@ def main():
         "meminfo": Path("/proc/meminfo").read_text() if Path("/proc/meminfo").exists() else None,
         "cgroup_cpu_max": Path("/sys/fs/cgroup/cpu.max").read_text().strip() if Path("/sys/fs/cgroup/cpu.max").exists() else None,
         "cgroup_memory_max": Path("/sys/fs/cgroup/memory.max").read_text().strip() if Path("/sys/fs/cgroup/memory.max").exists() else None,
-        "runtime_overrides": {key: value for key, value in os.environ.items() if key.startswith(("DOTNET_", "COMPlus_"))},
+        "runtime_overrides": {
+            key: os.environ[key]
+            for key in (
+                "DOTNET_TieredCompilation", "DOTNET_TieredPGO", "DOTNET_ReadyToRun",
+                "DOTNET_gcServer", "DOTNET_GCHeapHardLimit", "DOTNET_GCConserveMemory",
+                "COMPlus_TieredCompilation", "COMPlus_TieredPGO", "COMPlus_ReadyToRun",
+                "COMPlus_gcServer", "COMPlus_GCHeapHardLimit", "COMPlus_GCConserveMemory",
+            )
+            if key in os.environ
+        },
     }
     report = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -162,6 +176,8 @@ def main():
         },
         "environment": environment,
         "gates": gates, "deliberate_mismatch_rejected": sorted(rejections),
+        "negative_controls": rejection_results,
+        "rust_allocator_calibration": {"passed": True, "events": 3, "requested_bytes": 224},
         "samples": samples,
         "summary": {
             engine: {

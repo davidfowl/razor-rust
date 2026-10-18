@@ -37,8 +37,8 @@ string Render()
     slice.Data = data;
     using var writer = new StringWriter(CultureInfo.InvariantCulture);
     var result = slice.RenderAsync(writer);
-    if (!result.IsCompletedSuccessfully)
-        throw new InvalidOperationException("This synchronous workload must complete on the measuring thread.", result.IsFaulted ? result.AsTask().Exception : null);
+    if (!result.IsCompleted)
+        throw new InvalidOperationException("This synchronous workload must complete on the measuring thread.");
     result.GetAwaiter().GetResult();
     return writer.ToString();
 }

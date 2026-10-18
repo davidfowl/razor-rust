@@ -11,6 +11,8 @@ The existing encoder example is a separate microbenchmark.
 Requires Python 3.9+, Cargo/Rust 1.75+, Git, and the **.NET SDK 10.0.402**
 (including ASP.NET Core runtime). The benchmark is a separate Rust workspace;
 its checked-in lockfile does not change the runtime's Rust 1.75 baseline.
+The lock also constrains transitive `ignore`, `globset`, and `thiserror` releases
+because newer resolutions were not Cargo 1.75-compatible; use `--locked`.
 All paths below are relative to the repository root. Choose an unused upstream
 destination; never reset or modify an existing reference checkout.
 
@@ -49,7 +51,8 @@ between engines. Every model string is validated against the subset; this is
 not evidence of broader encoder parity. The checked-in expected HTML includes
 one trailing LF. There are no trusted/raw interpolation bypasses.
 
-The Rust port uses generated `html!`; Askama uses its compiled template,
+The Rust port uses generated `html!`; Askama uses its compiled template
+(`askama-list.html` explicitly emits LF because Askama strips the source's final LF),
 Maud its `html!` macro, and Tera its parsed `list.html` template with normal
 autoescaping. C# uses SDK-generated `List.cshtml` inheriting the **unaltered
 runtime sources** from the exact upstream commit. It is not handwritten
@@ -108,6 +111,9 @@ new requested size; deallocations are not subtracted. Bytes are **cumulative
 requested bytes**, not retained/peak heap, physical RSS, or allocator overhead.
 The allocation instrumentation is disabled for timing, but its atomic flag
 check on allocation remains overhead. No thread or other work is spawned.
+Before any rendering, a known-size calibration exercises allocation (64 bytes),
+reallocation (128 bytes), zeroed allocation (32 bytes), and deallocation, and
+requires exactly three events / 224 requested bytes.
 
 C# uses `GC.GetAllocatedBytesForCurrentThread` deltas in a separate synchronous
 render pass; a render that does not complete synchronously is an explicit
