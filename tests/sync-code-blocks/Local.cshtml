@@ -1,0 +1,2 @@
+@inherits LocalSlice
+@{var total = 0; var prefix = Effects.Prefix; using var lease = Effects.Enter(); Effects.Touch();}[@prefix@foreach (var value in Effects.Values) {total += value; Effects.Touch();<span>@value</span>}@total]
