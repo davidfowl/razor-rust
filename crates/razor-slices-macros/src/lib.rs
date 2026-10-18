@@ -39,6 +39,10 @@ enum Part {
         iterator: Expr,
         body: Vec<Part>,
     },
+    While {
+        condition: Expr,
+        body: Vec<Part>,
+    },
     Code(Vec<Stmt>),
     Await {
         future: Expr,
@@ -158,10 +162,17 @@ fn parse_parts(input: ParseStream<'_>, syntax: Syntax) -> Result<Vec<Part>> {
                 iterator,
                 body,
             });
+        } else if input.peek(Token![while]) {
+            input.parse::<Token![while]>()?;
+            let condition = input.call(Expr::parse_without_eager_brace)?;
+            let body = parse_body(input, syntax)?;
+            parts.push(Part::While { condition, body });
         } else if matches!(syntax, Syntax::Async) && input.peek(Token![@]) {
             parts.push(parse_directive(input)?);
         } else {
-            return Err(input.error("expected a string literal, { Rust expression }, if, or for"));
+            return Err(
+                input.error("expected a string literal, { Rust expression }, if, for, or while")
+            );
         }
     }
     Ok(parts)
@@ -200,6 +211,10 @@ fn generate_parts(
         } => {
             let body = generate_parts(body, runtime, writer, syntax);
             quote! { for #pattern in #iterator { #body } }
+        }
+        Part::While { condition, body } => {
+            let body = generate_parts(body, runtime, writer, syntax);
+            quote! { while #condition { #body } }
         }
         Part::Code(statements) => {
             let statements = statements.into_iter().map(|statement| match statement {
@@ -430,6 +445,69 @@ mod tests {
             "(runtime) for item in items {} else {}",
         ] {
             assert!(syn::parse_str::<Template>(input).is_err(), "{input}");
+        }
+    }
+
+    #[test]
+    fn parses_condition_controlled_loops_in_both_template_forms() {
+        for body in [
+            r#"while enabled() { "body" }"#,
+            r#"while let Some((key, value)) = next() { {key} {value} }"#,
+            r#"for item in &items { while item.pending() { if true { {item} } } }"#,
+            r#"while (Options { enabled: true }).enabled {}"#,
+            r#"while false { while let Some(value) = next() { {value} } }"#,
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_ok(),
+                "{body}"
+            );
+            assert!(
+                syn::parse_str::<AsyncTemplate>(&format!(
+                    "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+                ))
+                .is_ok(),
+                "{body}"
+            );
+        }
+        assert!(syn::parse_str::<AsyncTemplate>(
+            r#"(runtime) struct Page { model: () } => {
+                while pending() {
+                    @{ let value = work().await?; }
+                    @await { ready() };
+                    @flush;
+                    @render { child };
+                    @section { provider }, { "header" };
+                    {value}
+                }
+            }"#
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn rejects_malformed_or_unsupported_loop_syntax() {
+        for body in [
+            "while {}",
+            "while true",
+            "while let = next() {}",
+            "while let Some(value) next() {}",
+            "while true { 42 }",
+            "while false {} else {}",
+            "while false { break; }",
+            "while false { continue; }",
+            "'label: while false {}",
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_err(),
+                "{body}"
+            );
+            assert!(
+                syn::parse_str::<AsyncTemplate>(&format!(
+                    "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+                ))
+                .is_err(),
+                "{body}"
+            );
         }
     }
 

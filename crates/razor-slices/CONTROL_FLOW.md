@@ -41,6 +41,8 @@ if RustCondition { template }
 if RustCondition { template } else { template }
 if RustCondition { template } else if RustCondition { template } else { template }
 for RustPattern in RustIteratorExpression { template }
+while RustCondition { template }
+while let RustPattern = RustExpression { template }
 ```
 
 `if let` bindings, tuple/destructuring loop patterns, empty bodies and arbitrary
@@ -48,10 +50,13 @@ nesting work through Rust/syn parsing. Headers use Rust's ordinary control-flow
 expression boundary: parenthesize struct literals, e.g.
 `if (Options { enabled: true }).enabled { ... }`. A dangling `else`, missing
 `in`/body, unsupported tokens or invalid nested content is a compile error,
-never silently emitted text. `while`, `match`, DSL `break`/`continue`, declarations,
+never silently emitted text. `match`, DSL `break`/`continue`, declarations,
 Razor directives and asynchronous expressions are not introduced.
 
 Conditions and iterator expressions execute on each render, in source order.
+`while` conditions are re-evaluated before every iteration, including the
+final false condition; `while let` bindings are scoped to each selected body.
+See [while-loop evidence and limitations](../../docs/while-loops.md).
 Unselected bodies and empty loops do not evaluate interpolations; all branches
 are nevertheless type checked. Loop bindings are scoped to their body.
 Literals remain raw and strings remain escaped once; `HtmlString` and explicit
