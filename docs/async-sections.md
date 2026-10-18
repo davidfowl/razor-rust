@@ -3,10 +3,13 @@
 Focused milestone [#48](https://github.com/davidfowl/razor-rust/issues/48)
 under [#47](https://github.com/davidfowl/razor-rust/issues/47), delivered in
 [PR #49](https://github.com/davidfowl/razor-rust/pull/49).
-This branch explicitly depends on **Ready/unmerged PR #38**
-(`64b626a4869d7b7a46a1563e52f180ded929c458`). Neither that branch nor the
-synchronous layout/section stack #35/#46 is changed. Integrate #38 first;
-these APIs are not yet on main.
+The original source depended on PR #38
+(`64b626a4869d7b7a46a1563e52f180ded929c458`). These APIs and the
+synchronous layout/section stack were consolidated onto main through
+[PR #75](https://github.com/davidfowl/razor-rust/pull/75); that historical
+dependency is no longer an integration gate. Later
+[inherited-section lifecycle evidence](async-section-lifecycle.md) covers
+bounded cleanup/reuse behavior, not full managed lifecycle parity.
 
 ## Observe a section before its awaited work completes
 
