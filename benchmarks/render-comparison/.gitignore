@@ -1,0 +1,5 @@
+/target/
+/csharp/bin/
+/csharp/obj/
+/results/
+/__pycache__/
