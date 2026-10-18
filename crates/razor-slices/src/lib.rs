@@ -56,13 +56,15 @@ pub use razor_slices_macros::async_template as __async_template;
 /// `if`/`for`/`while` (including `while let`) use the same grammar as [`html!`].
 /// Async-only directives:
 ///
-/// - `@{ Rust statements }` introduces render-local bindings/work (including await).
 /// - `@await { future };` awaits unit output; `@await { future }?;` propagates
 ///   errors from a unit-result future. Value-producing awaits use Rust bindings.
 /// - `@flush;` awaits an explicit flush at that insertion point.
 /// - `@render { child };` executes a bare async child on the same writer,
 ///   bypassing declared layouts but retaining explicit composition.
 /// - `@section { provider }, { name };` inserts an explicit lazy async section.
+///
+/// `@{ Rust statements }` introduces render-local bindings/work in both macros;
+/// Rust awaits are supported only in the asynchronous template.
 ///
 /// No directive implicitly buffers or spawns. Successful children check the
 /// sink's automatic completion-flush policy; [`render_incremental`] additionally
@@ -104,6 +106,12 @@ macro_rules! async_template {
 /// (the renderer implements `Fn`, not `FnOnce` or `FnMut`). Borrowed captures
 /// cannot outlive their referents. See the crate's `examples/inline.rs` and
 /// `INLINE.md` for the initial grammar and limitations.
+///
+/// `@{ Rust statements }` declares render-local bindings and work, including
+/// mutable locals used by later template parts. Unit-valued tails retain the
+/// preceding bindings; non-unit tails are rejected. Locals are recreated on
+/// every render. Async-only directives and Rust awaits remain unsupported here.
+/// See `docs/sync-code-blocks.md` for scope and reference evidence.
 ///
 /// ```
 /// use razor_slices::{html, HtmlString, Slice};

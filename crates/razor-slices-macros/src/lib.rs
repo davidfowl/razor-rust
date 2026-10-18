@@ -149,6 +149,8 @@ fn parse_parts(input: ParseStream<'_>, syntax: Syntax) -> Result<Vec<Part>> {
             parts.push(Part::Literal(input.parse()?));
         } else if input.peek(syn::token::Brace) {
             parts.push(Part::Value(parse_expression(input)?));
+        } else if input.peek(Token![@]) && input.peek2(syn::token::Brace) {
+            parts.push(parse_directive(input)?);
         } else if input.peek(Token![if]) {
             parts.push(parse_if(input, syntax)?);
         } else if input.peek(Token![for]) {
@@ -402,6 +404,46 @@ mod tests {
             syn::parse_str(r#"(runtime) "<p>" {name} {1 + 2} r"</p>""#).unwrap();
         assert_eq!(template.parts.len(), 4);
         assert!(syn::parse_str::<Template>("(runtime)").is_ok());
+    }
+
+    #[test]
+    fn synchronous_blocks_reuse_scoped_statement_parsing() {
+        for body in [
+            "@{}",
+            r#"@{ let value = "local"; touch() } {value}"#,
+            r#"if true { @{ let value = "branch"; } {value} }"#,
+            r#"for value in &values { @{ let local = value; } {local} }"#,
+            "@{ let mut total = 0; } @{ total += 1; } {total}",
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_ok(),
+                "{body}"
+            );
+            assert!(
+                syn::parse_str::<AsyncTemplate>(&format!(
+                    "(runtime) struct Page {{ model: () }} => {{ {body} }}"
+                ))
+                .is_ok(),
+                "{body}"
+            );
+        }
+    }
+
+    #[test]
+    fn synchronous_blocks_do_not_enable_async_only_directives() {
+        for body in [
+            "@flush;",
+            "@await { work() };",
+            "@render { child };",
+            r#"@section { provider }, { "header" };"#,
+            "@{ let value = ; }",
+            "@{};",
+        ] {
+            assert!(
+                syn::parse_str::<Template>(&format!("(runtime) {body}")).is_err(),
+                "{body}"
+            );
+        }
     }
 
     #[test]
