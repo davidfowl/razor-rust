@@ -11,7 +11,7 @@ use crate::encode_html_to_writer;
 ///
 /// Unlike [`super::render_async`], this contract never buffers the whole template.
 /// Implementations await each write/flush and propagate errors with `?`. Call
-/// [`render_incremental`] for a final flush after successful execution; nested
+/// [`render_incremental`] for root completion (a final flush by default); nested
 /// templates use [`AsyncHtmlWriter::write_slice`] for completion auto-flush.
 /// Raw trait calls remain execution hooks without an implicit final flush.
 ///
@@ -240,7 +240,7 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
     /// native [`AsyncSliceWriter::unflushed_bytes`] count takes precedence over
     /// the fallback count of successful writes through this output borrow.
     /// A sink may disable these checks with [`AsyncSliceWriter::auto_flush_enabled`]
-    /// without disabling explicit or root-final flushing.
+    /// without disabling explicit flushing or the default root-final flush.
     pub async fn write_slice(
         &mut self,
         slice: &(impl AsyncSlice + ?Sized),
@@ -259,6 +259,13 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
                 .unflushed_bytes()
                 .unwrap_or(self.unflushed_bytes)
                 >= 16 * 1_024
+    }
+
+    async fn complete_root(&mut self) -> io::Result<()> {
+        if self.writer.always_flush_on_root_completion() || self.should_auto_flush() {
+            self.flush().await?;
+        }
+        Ok(())
     }
 
     /// Executes a named section without adding a dispatch-level auto-flush.
@@ -290,7 +297,7 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
     }
 }
 
-/// Executes an [`AsyncSlice`] incrementally and flushes after success.
+/// Executes an [`AsyncSlice`] incrementally and flushes after success by default.
 ///
 /// Earlier output can be observed before later awaited work completes, provided
 /// the destination exposes it (use a mid-template flush for buffered sinks).
@@ -309,14 +316,19 @@ impl<'a, W: AsyncSliceWriter + Send> AsyncHtmlWriter<'a, W> {
 /// preexisting sink buffers; the default fallback starts at zero for each new
 /// output borrow and counts only successful writes through it.
 /// [`AsyncSliceWriter::auto_flush_enabled`] can disable automatic completion
-/// flushes, but not this entry point's final flush.
+/// flushes, but by default not this entry point's final flush. A raw-destination
+/// adapter can return `false` from
+/// [`AsyncSliceWriter::always_flush_on_root_completion`] to apply the automatic
+/// completion policy at the root instead. In that mode, successful output below
+/// the threshold (or with automatic flushing disabled) remains unflushed until
+/// the caller or an explicit template flush requests it.
 pub async fn render_incremental(
     slice: &(impl AsyncSlice + ?Sized),
     writer: &mut (impl AsyncSliceWriter + Send),
 ) -> Result<(), AsyncRenderError> {
     let mut output = AsyncHtmlWriter::new(writer);
     slice.render_into(&mut output).await?;
-    output.flush().await?;
+    output.complete_root().await?;
     Ok(())
 }
 
@@ -333,6 +345,9 @@ pub async fn render_incremental(
 /// are otherwise unchanged. No suffix or final flush runs after cancellation.
 /// Partial writes are not rolled back; the caller still owns the destination.
 /// A cancelled token stays cancelled across repeated renders.
+/// Root completion uses the same destination policy as [`render_incremental`]:
+/// an unconditional final flush by default, or an opt-in automatic threshold
+/// check through [`AsyncSliceWriter::always_flush_on_root_completion`].
 ///
 /// ```compile_fail
 /// use razor_slices::{
@@ -364,7 +379,7 @@ pub async fn render_incremental_with_context<T: Sync>(
         .run(async {
             let mut output = AsyncHtmlWriter::with_cancellation(writer, token);
             slice.render_into(&mut output).await?;
-            output.flush().await?;
+            output.complete_root().await?;
             Ok(())
         })
         .await

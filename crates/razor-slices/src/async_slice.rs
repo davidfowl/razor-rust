@@ -70,11 +70,33 @@ pub trait AsyncSliceWriter {
     ///
     /// The default `true` preserves pipe-like completion flushing. TextWriter-like
     /// sinks can return `false`; disabled boundaries do not query
-    /// [`Self::unflushed_bytes`]. Explicit [`AsyncHtmlWriter::flush`], the final
-    /// flush of [`render_incremental`], and the buffered [`render_async`] bridge
-    /// still flush and propagate errors/cancellation as before. This is not a
-    /// switch for destination writes, shutdown, or slice disposal.
+    /// [`Self::unflushed_bytes`]. Explicit [`AsyncHtmlWriter::flush`] and the
+    /// buffered [`render_async`] bridge still flush. By default,
+    /// [`render_incremental`] also retains its unconditional root-final flush;
+    /// opting out with [`Self::always_flush_on_root_completion`] applies this
+    /// automatic policy at the root too. This is not a switch for destination
+    /// writes, shutdown, or slice disposal.
     fn auto_flush_enabled(&self) -> bool {
+        true
+    }
+
+    /// Always flushes after successful incremental root rendering.
+    ///
+    /// The default `true` preserves the existing final-flush contract of
+    /// [`render_incremental`] and [`render_incremental_with_context`], including
+    /// an empty render or a root whose children already flushed.
+    ///
+    /// Raw-destination adapters can opt into C#-style completion by returning
+    /// `false`: the root then uses [`Self::auto_flush_enabled`] and the inclusive
+    /// 16,384-byte threshold, just like a completed child. With automatic
+    /// flushing disabled too, successful rendering need not flush at all.
+    /// The caller is responsible for flushing any remaining buffered output.
+    ///
+    /// This does not change explicit template flushes, child/layout boundaries,
+    /// the buffered [`render_async`] bridge, or destination ownership. Existing
+    /// Tokio and HTTP adapters retain the default; opting out does not provide
+    /// native `PipeWriter` flush-result flags or full TextWriter lifecycle parity.
+    fn always_flush_on_root_completion(&self) -> bool {
         true
     }
 
@@ -90,7 +112,8 @@ pub trait AsyncSliceWriter {
     /// writes through one [`AsyncHtmlWriter`] borrow accumulate until a flush
     /// is requested, including a pending/failed flush. It cannot see prebuffered
     /// or partially accepted failing writes. This does not add per-write flushes,
-    /// expose native flush-result flags, or change explicit/final flushing.
+    /// expose native flush-result flags, or change explicit flushing or the
+    /// default unconditional root-final flush.
     fn unflushed_bytes(&self) -> Option<usize> {
         None
     }
