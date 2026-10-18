@@ -20,7 +20,7 @@ if (fixture.Repeat is < 1 or > 1024 || fixture.Items.Length == 0)
 var data = new ListData(fixture.Title,
     Enumerable.Range(0, fixture.Repeat).SelectMany(_ => fixture.Items).ToArray());
 foreach (var text in data.Items.SelectMany(item => new[] { item.Name, item.Detail }).Prepend(data.Title))
-    if (text.Any(character => character is < ' ' or > '~' || "\"'/".Contains(character)))
+    if (text.Any(character => !char.IsAsciiLetterOrDigit(character) && !" &<>".Contains(character)))
         throw new InvalidOperationException("Fixture exceeds common encoder subset.");
 var expected = File.ReadAllBytes(args[2]);
 var warmup = int.Parse(args[3], CultureInfo.InvariantCulture);

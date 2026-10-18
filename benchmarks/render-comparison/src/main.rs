@@ -129,10 +129,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     ) {
         if !text
             .bytes()
-            .all(|byte| (32..=126).contains(&byte) && !b"\"'/".contains(&byte))
+            .all(|byte| byte.is_ascii_alphanumeric() || b" &<>".contains(&byte))
         {
             return Err(
-                "fixture exceeds common encoder subset: printable ASCII except quotes and slash"
+                "fixture exceeds common encoder subset: ASCII letters, digits, spaces and &<>"
                     .into(),
             );
         }

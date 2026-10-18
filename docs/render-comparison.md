@@ -45,9 +45,10 @@ versions, compiler/runtime versions, hardware/OS/cgroup information).
 
 `fixture.json` defines four typed name/detail rows repeated four times.
 Title and row fields contain ordinary ASCII plus `&`, `<`, and `>`.
-The common encoder subset is printable ASCII excluding double/single quotes
-and slash: entity spellings for these excluded characters and non-ASCII differ
-between engines. Every model string is validated against the subset; this is
+The common encoder subset is ASCII letters, digits, spaces, `&`, `<`, and `>`.
+Quotes, slash, other punctuation and non-ASCII are deliberately excluded:
+encoder policies and entity spellings differ between engines. Every model
+string is validated against the subset; this is
 not evidence of broader encoder parity. The checked-in expected HTML includes
 one trailing LF. There are no trusted/raw interpolation bypasses.
 
@@ -128,3 +129,69 @@ accounting units**. No zero-allocation or superiority claim follows.
 short fixed runs despite warmup. Repeat fresh invocations on controlled
 hardware for decisions; cloud observations are not release guarantees.
 There are no arbitrary performance pass/fail thresholds.
+
+## Recorded cloud observation and qualification
+
+[Release evidence](../benchmarks/render-comparison/evidence/measure.json) and
+[smoke 1](../benchmarks/render-comparison/evidence/smoke-1.json) /
+[smoke 2](../benchmarks/render-comparison/evidence/smoke-2.json) retain the raw
+results from clean source commit
+`2584e55728167ec93e6cdae5166abfa2c86e3d61`; the subsequent evidence commit
+only adds these artifacts and this documentation. All three invocations passed
+five exact **960-byte** gates and deliberate-mismatch rejection for all engines.
+Fixture SHA-256:
+`674c5f07c9904dbd9136f34d69b1d16c4403535765daf91a79eb6536b209ee77`.
+Expected HTML SHA-256:
+`d1d94df8149f03d8bdb7c968700a3cc2bba1e8b48953248bab53990feb1aac92`.
+
+The release observation used Rust 1.99.1 / LLVM 23.1.1, .NET SDK 10.0.402,
+C# compiler `5.9.0-1.26505.111`, .NET/ASP.NET Core runtime 10.0.13,
+Linux x86-64 / glibc 2.39, and AMD EPYC 9V74 with two visible/affinity CPUs.
+Container CPU/memory quota files were unavailable; this does not prove unlimited
+resources. Full version/environment details and all samples are in the JSON.
+
+| Engine | Median renders/s | Allocated bytes/render | Rust allocation requests/render |
+| --- | ---: | ---: | ---: |
+| razor-rust 0.1.0 (this source) | 371,250 | 2,040 | 8 |
+| Askama 0.12.1 | 730,112 | 2,356 | 5 |
+| Maud 0.26.0 | 1,939,941 | 3,038 | 5 |
+| Tera 1.19.1 | 150,789 | 5,031 | 135 |
+| C# RazorSlices 0.12.1 pinned runtime | 115,301 | 4,752 (managed) | not measured |
+
+These are observations of **different materialization paths and allocation
+accounting**, not a ranking of the engines' general capabilities. C# throughput
+ranged from about 61,340 to 153,565 renders/s within this short run. Smoke timings
+are intentionally too short to interpret (including a visible Maud outlier);
+neither outliers nor slower samples were discarded.
+
+Qualification commands, run in addition to the three recorded invocations:
+
+```sh
+cargo +1.75.0 build --manifest-path benchmarks/render-comparison/Cargo.toml --release --locked
+# Immediately after that build, run its native binary to qualify 1.75-generated output:
+benchmarks/render-comparison/target/release/render-comparison \
+  verify benchmarks/render-comparison/fixture.json benchmarks/render-comparison/expected.html 2 1 2
+cargo fmt --manifest-path benchmarks/render-comparison/Cargo.toml -- --check
+cargo clippy --manifest-path benchmarks/render-comparison/Cargo.toml --release --all-targets --locked -- -D warnings
+python3 -m py_compile benchmarks/render-comparison/run.py
+cargo test -p razor-slices --lib
+cargo test -p razor-slices-macros --lib
+```
+
+Rust 1.75 release compilation and exact native Rust output passed; the existing
+runtime's 37 and macro crate's 14 unit tests passed. C# Release builds passed
+with warnings treated as errors. The allocator calibration passed before every
+native Rust invocation. Evidence arithmetic, source cleanliness and identical
+harness hashes across the three runs were checked separately.
+
+Two real qualification failures were resolved, not hidden: Cargo 1.75 rejected
+the initial transitive `ignore` 0.4.30 resolution's edition-2024 manifest, so
+the standalone lock was constrained to compatible versions; the first equality
+run rejected Askama's 959-byte output versus the 960-byte expected file, so
+its template now explicitly renders LF. No normalization or handwritten
+framework substitute was introduced, and no timing was allowed after that
+failed gate.
+
+Known gaps remain broader workloads/escaping, streaming/HTTP output, native
+PipeWriter comparison, controlled-hardware statistical benchmarking, full
+upstream source-generator/package-target parity, and the rest of #8's acceptance.
