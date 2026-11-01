@@ -55,3 +55,4 @@ What this makes easier, harder, or forecloses going forward.
 | [0003](./0003-byte-oriented-zero-allocation-html-encoding.md) | Byte-oriented, zero-allocation HTML encoding | Accepted (implemented) |
 | [0004](./0004-ci-hardening-and-gated-crates-io-release-workflow.md) | CI hardening & gated crates.io release workflow | Accepted (implemented) |
 | [0005](./0005-simd-html-encoding.md) | SIMD-vectorized HTML encoder byte scanning | Accepted (implemented) |
+| [0006](./0006-helpers-methods-delegates.md) | Shareable helpers, templated methods and delegates | Accepted (patterns + tests; no grammar change) |
