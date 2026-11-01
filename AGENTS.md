@@ -50,13 +50,17 @@ do not duplicate work already in progress.
   completed layouts check the inclusive 16,384 accepted-output-byte threshold.
   Writes/arbitrary awaits/plain sections do not auto-flush. TextWriter-like
   sinks can opt out with `AsyncSliceWriter::auto_flush_enabled() -> false`;
-  the default remains enabled. Root final flush and explicit flush remain unchanged. Optional
+  the default remains enabled. Explicit flush remains unchanged; root completion
+  defaults to unconditional flushing. Raw adapters can opt into completion-policy
+  flushing with `always_flush_on_root_completion() -> false`; see
+  [root-policy qualification](docs/root-flush-policy.md). Optional
   `AsyncSliceWriter::unflushed_bytes()` supplies an authoritative native snapshot;
   the default `None` retains successful-write fallback accounting, reset when
   flush is requested. See docs/parity.md for bounded #74 differential evidence
   and remaining native flag/root-lifecycle gaps. Request scope #68 shares this writer's
   cancellation token with layouts and completion flushes; broader #69
-  acceptance remains separate from this consolidation.
+  acceptance now includes [combined token identity and pending-write cases](docs/combined-request-cancellation.md),
+  without full request/lifecycle equivalence.
 - `AsyncSliceWriter` is runtime-agnostic. The default-off `tokio` feature adds
   `TokioWriter`; the core has no mandatory async-runtime dependency. Tokio is
   also a dev-dependency for tests, which does not make the adapter available
@@ -88,12 +92,15 @@ do not duplicate work already in progress.
   Dedicated cancellation tokens are signalled on unfinished body drop; explicit
   cancellation is a body error. Core request data remains explicit typed model
   input, not automatic framework/service injection. See docs/request-context.md.
-- This integration preview assembles deliveries merged through #75, not a released
+- This integration preview assembles deliveries merged through #75, with later
+  bounded increments through #91/#94, not a released
   full port. Broader generated value/grammar parity remains tracked in
   [#3](https://github.com/davidfowl/razor-rust/issues/3); synchronous nested
   section context #66 has bounded differential evidence in docs/parity.md;
   broader layout/request lifetime parity
   remains #47/#52/#11. Typed async context is documented in docs/async-layouts.md.
+  [Inherited async-section lifecycle qualification](docs/async-section-lifecycle.md)
+  covers common render-local cleanup, not managed owner disposal or initialization.
   See [docs/integration.md](docs/integration.md) for exact source dependencies.
   Do not turn a proposed ADR or issue example into an accepted public API
   decision. Later owner-delegated reversible implementation choices do not

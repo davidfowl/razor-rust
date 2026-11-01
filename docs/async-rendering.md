@@ -6,7 +6,8 @@ one flush. It does not expose bytes during template execution.
 
 `AsyncSlice` is a separate, reusable, statically dispatched async template
 contract. `render_incremental` calls `render_into` with a borrowed
-`AsyncHtmlWriter`, then awaits a final flush **only after success**.
+`AsyncHtmlWriter`, then by default awaits a final flush **only after success**.
+Raw adapters may instead select [root completion policy](root-flush-policy.md).
 Implementations write/await/flush in source order, propagating failures with
 `?`; nested async slices use `output.write_slice(&child).await?` on the same
 output, checking the completion threshold without an implicit final flush,
@@ -92,13 +93,17 @@ checks query its current snapshot when enabled, even after a failed or dropped f
 Original errors stop execution; there is no final flush
 after failure. Pending flush prevents later template code. Dropping a pending
 render stops polling it without rollback or independently spawned cancellation.
-The existing root `render_incremental` still final-flushes unconditionally on
+The root `render_incremental` defaults to an unconditional final flush on
 success, including below threshold; the synchronous buffered bridge is unchanged.
-Both still flush when `auto_flush_enabled()` returns `false`. Explicit flushes
+Both still flush when only `auto_flush_enabled()` returns `false`. Raw adapters
+can separately return `false` from `always_flush_on_root_completion()` to apply
+automatic completion policy at the root; see the
+[66-case pinned qualification and caller obligations](root-flush-policy.md).
+Explicit flushes
 also retain backpressure, original errors and scoped cancellation; opting out
 does not turn a pending/failed flush into success. No slice disposal or
 destination completion is added. In particular, raw C# TextWriter root rendering
-does not final-flush; this preserved Rust root contract is not full TextWriter
+does not final-flush; the preserved Rust default is not full TextWriter
 lifecycle equivalence.
 
 The default `unflushed_bytes() -> None` retains existing behavior: fallback

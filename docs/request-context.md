@@ -138,7 +138,9 @@ require application cooperation and are not automatically interrupted by
 identical .NET application-await semantics. Upstream synchronous buffer writes
 and native pipe flags are not replicated. Successful completed slices/layouts
 do check the inclusive 16,384-byte threshold unless the sink disables automatic
-completion flushing. That opt-out does not disable scoped explicit/final flushes.
+completion flushing. That opt-out alone does not disable scoped explicit/final
+flushes. The separate [raw-root policy](root-flush-policy.md) can opt out of
+unconditional final flushing; built-in transport defaults remain unchanged.
 
 ## Known gaps / follow-ups
 
@@ -146,15 +148,19 @@ completion flushing. That opt-out does not disable scoped explicit/final flushes
   request-scope/declared-layout acceptance. Merged #75 includes both #68 and
   #65. Its regressions exercise repeated generated nested
   layouts, cancellation inside a held child section, shared threshold accounting
-  and cancellation during an automatic flush. Further tests-only acceptance in
-  [PR #85](https://github.com/davidfowl/razor-rust/pull/85) is ready for review
-  but remains unmerged at `c8dbc2790d2fd625dcd09cfaca0f4b015d214a3e`.
-  #69 remains open; neither the landed bounded coverage nor that pending PR
-  claims full lifecycle parity.
+  and cancellation during an automatic flush. Further tests-only acceptance
+  originally proposed in [PR #85](https://github.com/davidfowl/razor-rust/pull/85)
+  landed through [PR #94](https://github.com/davidfowl/razor-rust/pull/94).
+  [Combined request cancellation](combined-request-cancellation.md) records
+  five shared C# rows for token identity, output, cooperative cancellation and
+  original failures, plus Rust-only pending-write/drop and request-isolation
+  cases. #69 remains open; this bounded coverage does not claim full lifecycle parity.
 - #52 retains automatic HTTP request metadata/service association and portable
   response start; generic request data is explicit in this milestone.
 - #11 retains native writer completion/cancellation flags, full TextWriter
   root/lifecycle equivalence, disposal/initialization and broader encoder policy.
   TextWriter-like completion opt-out has [bounded evidence](parity.md#textwriter-like-completion-policy).
+  [Raw-root policy evidence](root-flush-policy.md) additionally covers opt-in
+  root completion, not full native writer or HTTP lifecycle equivalence.
   The synchronous buffered bridge is
   unchanged and has no new cancellation API.
