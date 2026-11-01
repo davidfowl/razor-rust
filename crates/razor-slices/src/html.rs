@@ -139,6 +139,145 @@ pub fn encode_html_to_writer(value: &str, writer: &mut dyn io::Write) -> io::Res
     write_encoded(value.as_bytes(), |chunk| writer.write_all(chunk))
 }
 
+/// How an [`HtmlEncoderPolicy`] treats one Unicode scalar value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Escape {
+    /// Emit the character unchanged.
+    Keep,
+    /// Replace the character with a fixed entity, e.g. `&amp;`.
+    Entity(&'static str),
+    /// Replace the character with an upper-case hexadecimal numeric character
+    /// reference, e.g. `&#x96EA;`. Supplementary-plane scalars produce one
+    /// reference for the whole scalar (`&#x1F980;`), not a surrogate pair.
+    NumericReference,
+}
+
+/// A pluggable HTML encoding policy, the Rust analogue of choosing a
+/// configured `System.Text.Encodings.Web.HtmlEncoder` (see ADR
+/// [0007](../../docs/adr/0007-configurable-encoder-policy.md)).
+///
+/// Only [`escape`](Self::escape) is required. The provided
+/// [`encode_to_writer`](Self::encode_to_writer) walks `char`s;
+/// [`DefaultHtmlEncoder`] overrides it with the SIMD byte scan so the default
+/// path pays nothing for the abstraction. The free functions
+/// [`encode_html_to`] and [`encode_html_to_writer`] always use the default
+/// policy and are unchanged.
+pub trait HtmlEncoderPolicy {
+    /// Decides how `c` is written.
+    fn escape(&self, c: char) -> Escape;
+
+    /// Encodes `value` to `writer` under this policy.
+    fn encode_to_writer(&self, value: &str, writer: &mut dyn io::Write) -> io::Result<()> {
+        let mut start = 0;
+        for (i, c) in value.char_indices() {
+            let escape = self.escape(c);
+            if escape == Escape::Keep {
+                continue;
+            }
+            writer.write_all(&value.as_bytes()[start..i])?;
+            match escape {
+                Escape::Keep => unreachable!(),
+                Escape::Entity(entity) => writer.write_all(entity.as_bytes())?,
+                Escape::NumericReference => write!(writer, "&#x{:X};", c as u32)?,
+            }
+            start = i + c.len_utf8();
+        }
+        writer.write_all(&value.as_bytes()[start..])
+    }
+
+    /// Encodes `value` to a [`fmt::Write`] sink under this policy.
+    fn encode_to(&self, value: &str, writer: &mut dyn fmt::Write) -> fmt::Result {
+        struct Adapter<'a>(&'a mut dyn fmt::Write);
+        impl io::Write for Adapter<'_> {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.write_all(buf)?;
+                Ok(buf.len())
+            }
+            fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+                // Chunks are split only at char boundaries by the encoder.
+                let text = std::str::from_utf8(buf)
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+                self.0
+                    .write_str(text)
+                    .map_err(|_| io::Error::other("fmt::Write failed"))
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        self.encode_to_writer(value, &mut Adapter(writer))
+            .map_err(|_| fmt::Error)
+    }
+}
+
+/// The default policy: escapes `& < > " '` only, with the existing entities.
+/// Identical to [`encode_html_to_writer`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DefaultHtmlEncoder;
+
+impl HtmlEncoderPolicy for DefaultHtmlEncoder {
+    #[inline]
+    fn escape(&self, c: char) -> Escape {
+        match c {
+            '&' | '<' | '>' | '"' | '\'' => Escape::Entity(escape_entity(c as u8)),
+            _ => Escape::Keep,
+        }
+    }
+
+    #[inline]
+    fn encode_to_writer(&self, value: &str, writer: &mut dyn io::Write) -> io::Result<()> {
+        encode_html_to_writer(value, writer)
+    }
+
+    #[inline]
+    fn encode_to(&self, value: &str, writer: &mut dyn fmt::Write) -> fmt::Result {
+        encode_html_to(value, writer)
+    }
+}
+
+/// Opt-in broader policy: the default five characters plus every non-ASCII
+/// scalar and ASCII control character (other than tab, LF and CR) as a
+/// numeric character reference, yielding pure-ASCII output.
+///
+/// Unlike .NET's `HtmlEncoder.Default`, `'` stays `&#39;` and `+` is not
+/// escaped; this is not a claim of byte-for-byte .NET parity.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct UnicodeHtmlEncoder;
+
+impl HtmlEncoderPolicy for UnicodeHtmlEncoder {
+    #[inline]
+    fn escape(&self, c: char) -> Escape {
+        match c {
+            '&' | '<' | '>' | '"' | '\'' => Escape::Entity(escape_entity(c as u8)),
+            '\t' | '\n' | '\r' => Escape::Keep,
+            c if c.is_ascii_control() || !c.is_ascii() => Escape::NumericReference,
+            _ => Escape::Keep,
+        }
+    }
+}
+
+/// Pairs a value with an encoder policy so it can be written through
+/// [`WriteHtmlValue`]. Strings are encoded under `policy`; the wrapped value
+/// is borrowed.
+#[derive(Debug, Clone, Copy)]
+pub struct Encoded<'a, P> {
+    value: &'a str,
+    policy: P,
+}
+
+impl<'a, P: HtmlEncoderPolicy> Encoded<'a, P> {
+    /// Wraps `value` for encoding under `policy`.
+    pub fn new(value: &'a str, policy: P) -> Self {
+        Encoded { value, policy }
+    }
+}
+
+impl<P: HtmlEncoderPolicy> WriteHtmlValue for Encoded<'_, P> {
+    fn write_html_to(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.policy.encode_to_writer(self.value, writer)
+    }
+}
+
 /// A fixed-capacity, stack-allocated buffer implementing [`fmt::Write`],
 /// used to format primitives (integers, floats, bools) without a heap
 /// allocation.
