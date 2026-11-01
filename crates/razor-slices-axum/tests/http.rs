@@ -1358,3 +1358,48 @@ async fn real_http_request_contexts_are_isolated_and_explicit_cancellation_fails
     .await
     .expect("isolated request-context HTTP handshake must not deadlock");
 }
+
+async_template! {
+    struct ContentTypePage { model: String } => { "<p>" {&model} "</p>" }
+}
+
+#[tokio::test]
+async fn custom_content_type_applies_to_buffered_and_streaming_success() {
+    let xhtml = axum::http::HeaderValue::from_static("application/xhtml+xml; charset=utf-8");
+    let response = SliceResponse::new(html! { "<p>" {"a&b"} "</p>" })
+        .with_content_type(xhtml.clone())
+        .into_response();
+    assert_eq!(response.headers()["content-type"], xhtml);
+    assert_eq!(body(response).await, b"<p>a&amp;b</p>");
+
+    let response = StreamingSliceResponse::new(ContentTypePage::new("a&b".into()))
+        .with_content_type(axum::http::HeaderValue::from_static(
+            "text/plain; charset=utf-8",
+        ))
+        .into_response();
+    assert_eq!(
+        response.headers()["content-type"],
+        "text/plain; charset=utf-8"
+    );
+    assert_eq!(body(response).await, b"<p>a&amp;b</p>");
+}
+
+#[tokio::test]
+async fn custom_content_type_does_not_change_buffered_failure_response() {
+    struct Fails;
+    impl Slice for Fails {
+        fn render(&self, _: &mut dyn fmt::Write) -> fmt::Result {
+            Err(fmt::Error)
+        }
+    }
+    let response = SliceResponse::new(Fails)
+        .with_content_type(axum::http::HeaderValue::from_static(
+            "application/xhtml+xml",
+        ))
+        .into_response();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_ne!(
+        response.headers().get("content-type").map(|v| v.as_bytes()),
+        Some(&b"application/xhtml+xml"[..])
+    );
+}

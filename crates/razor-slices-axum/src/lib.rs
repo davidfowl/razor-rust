@@ -20,17 +20,20 @@
 use std::io;
 
 use axum::{
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{header::CONTENT_TYPE, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use razor_slices::Slice;
+
+const HTML_CONTENT_TYPE: &str = "text/html; charset=utf-8";
 
 mod streaming;
 pub use streaming::StreamingSliceResponse;
 
 /// A slice returned from an Axum handler as fully buffered UTF-8 HTML.
 ///
-/// Defaults to status 200 and `text/html; charset=utf-8`. Rendering runs once
+/// Defaults to status 200 and `text/html; charset=utf-8` (see
+/// [`Self::with_content_type`]). Rendering runs once
 /// per conversion, on the calling thread, before any bytes become visible to
 /// Axum. Borrowed slices/models need not be `'static` because the resulting
 /// response owns its body.
@@ -46,6 +49,7 @@ pub use streaming::StreamingSliceResponse;
 pub struct SliceResponse<S> {
     slice: S,
     status: StatusCode,
+    content_type: HeaderValue,
 }
 
 impl<S: Slice> SliceResponse<S> {
@@ -54,6 +58,7 @@ impl<S: Slice> SliceResponse<S> {
         Self {
             slice,
             status: StatusCode::OK,
+            content_type: HeaderValue::from_static(HTML_CONTENT_TYPE),
         }
     }
 
@@ -64,6 +69,17 @@ impl<S: Slice> SliceResponse<S> {
     /// not transmit a body when served over HTTP.
     pub fn with_status(mut self, status: StatusCode) -> Self {
         self.status = status;
+        self
+    }
+
+    /// Overrides the `Content-Type` of successful responses.
+    ///
+    /// The body is always UTF-8 text produced by the slice; this only changes
+    /// the declared media type (for example `application/xhtml+xml; charset=utf-8`
+    /// or `text/plain; charset=utf-8`). The 500 response for rendering failures
+    /// is unaffected.
+    pub fn with_content_type(mut self, content_type: HeaderValue) -> Self {
+        self.content_type = content_type;
         self
     }
 
@@ -79,12 +95,7 @@ impl<S: Slice> SliceResponse<S> {
         self.slice.render_to_writer(&mut bytes)?;
         let html = String::from_utf8(bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        Ok((
-            self.status,
-            [(CONTENT_TYPE, "text/html; charset=utf-8")],
-            html,
-        )
-            .into_response())
+        Ok((self.status, [(CONTENT_TYPE, self.content_type)], html).into_response())
     }
 }
 
