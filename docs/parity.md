@@ -7,7 +7,7 @@ The reference is **DamianEdwards/RazorSlices at
 with `VersionPrefix` **0.12.1** in `src/Directory.Build.props`.
 This is an exact source pin, not a claim that a NuGet release or moving `main`
 was tested. It is the same reference used by the existing layout, async,
-request-context docs and issues #66/#74.
+request-context docs and issues #66/#74 (both closed).
 
 For each behavior, parity requires an observable contract: exact output,
 dispatch/order, failure behavior, or a measured streaming boundary. Matching
@@ -43,15 +43,15 @@ An implemented row is not blanket verification of its whole feature.
 | Boolean/float/quote/Unicode reference behavior beyond the shared subset | Missing, reference characterized | Eighteen C#-only `primitive-outcomes` cases below expose direct/generic boolean path differences and default formatting/encoder policy. These are not Rust differential verification or permission to copy a reference defect/change Rust defaults. |
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
 | Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
-| Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags remain unrepresented under #74. |
+| Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags remain unrepresented; #74 closed with that sub-item declined (pinned C# discards non-faulted flags). |
 | Pipe versus TextWriter-like completion policy at 16,383/16,384/16,385 bytes, nested partials, explicit flush and layout completion | Verified, bounded | Twelve C# `flush-policy` cases match shared `fixtures/flush-policy.txt` and `flush_policy::pinned_csharp_golden_matches_completion_policy_not_root_final_flush`, with both Rust native/fallback counting. Default enabled; TextWriter-like opt-out alone suppresses completion checks, not explicit/default-root-final/bridge flushes. The separate raw-root opt-in is qualified below. |
 | Opt-out through generated children, nested declared/explicit layouts and layout-owned section children; original failures, held flushes, cancellation/drop | Implemented | Six `flush_policy` regressions include these Rust adapter/error contracts, unchanged explicit/root-final/bridge flushing, and no native-counter query when disabled. These cases do not establish C# error/lifecycle equivalence. |
 | Native flush-result flags versus faulted/cancelled operations | Missing, reference characterized | The C#-only `flush-outcomes` mode below records twelve reference cases. Native flags are not exposed by Rust; the TextWriter completion subset now has separate bounded differential evidence above. |
 | Opt-in raw PipeWriter/TextWriter-like root completion | Verified, bounded | [Root-policy qualification](root-flush-policy.md): `AsyncSliceWriter::always_flush_on_root_completion() -> false` applies automatic policy at the root. The 66-row shared fixture covers native/fallback/text destinations and immediate/held execution. Defaults, built-in transports and the buffered bridge retain unconditional final flushing; native flags and full lifecycle/HTTP equivalence remain outside this evidence. |
-| Typed request scope and cancellation; buffered/streaming HTTP | Implemented | `request_context` and Axum transport tests; assembled request/layout token and cancellation evidence is separately bounded below. Framework service injection, portable response-start and full lifecycle equivalence remain unverified/missing under #47/#52/#11. |
-| Combined declared-layout request token identity and cancellation | Verified, bounded common subset | [Combined cancellation qualification](combined-request-cancellation.md): five shared rows cover eleven token/context seams, full/bare output, cooperative held-section/native-flush cancellation and original destination failure. All 13 partially accepted pending writes (cancel/drop), one-byte Tokio delivery and request isolation are Rust-only acceptance. No full #69/#52/#11 or arbitrary C# await-cancellation equivalence. |
+| Typed request scope and cancellation; buffered/streaming HTTP | Implemented | `request_context` and Axum transport tests; assembled request/layout token and cancellation evidence is separately bounded below. Framework service injection, a portable response-start API and full lifecycle equivalence are not implemented; #11/#47/#52 are closed and these are deferred, post-v1.0 work. |
+| Combined declared-layout request token identity and cancellation | Verified, bounded common subset | [Combined cancellation qualification](combined-request-cancellation.md): five shared rows cover eleven token/context seams, full/bare output, cooperative held-section/native-flush cancellation and original destination failure. All 13 partially accepted pending writes (cancel/drop), one-byte Tokio delivery and request isolation are Rust-only acceptance. #69 is closed on this evidence; no arbitrary C# await-cancellation equivalence is claimed. |
 | Configurable .NET `HtmlEncoder`, broader Unicode/numeric/date formatting | Missing | Rust's five-character encoder and fixed primitive formatting are not byte-for-byte configurable C# policy parity. Requires dedicated differential cases and explicit compatibility decisions. |
-| C# initialization, pooling and disposal lifecycle | Missing, reference characterized | Eight C#-only `render-lifecycle` cases measure initialization, local cleanup, `Dispose` override calls, destination ownership and explicit same-instance retry. The additional `layout-lifecycle` mode characterizes two-layout disposal cascades on success/writer errors; only its common output/local-cleanup subset is shared. Rust retains ordinary ownership. Pooling, throwing-disposal and framework/service lifetime equivalence remain unverified under #47/#11/#52. |
+| C# initialization, pooling and disposal lifecycle | Missing, reference characterized | Eight C#-only `render-lifecycle` cases measure initialization, local cleanup, `Dispose` override calls, destination ownership and explicit same-instance retry. The additional `layout-lifecycle` mode characterizes two-layout disposal cascades on success/writer errors; only its common output/local-cleanup subset is shared. Rust retains ordinary ownership. Pooling, throwing-disposal and framework/service lifetime equivalence remain unverified and unclaimed (#47/#11/#52 closed). |
 | Razor files/`@section` syntax, async trait objects and local-only async futures | Unsupported | Current authoring is the accepted inline proc-macro mechanism, not Razor parsing. Upstream also avoids Razor `@section`; Rust sections are explicit providers. No additional authoring/API approval is implied. |
 
 ## Rust compiler compatibility
@@ -100,10 +100,13 @@ cross-language or cancellation/lifecycle parity.
 
 ## Render lifecycle and error-state cleanup
 
-The live #11 discussion leaves initialization/disposal and writer lifecycle
-parity open. #47 covers section/layout context and error boundaries; #52
-separately covers HTTP peer disconnect, request cancellation and response start.
-None requires copying a managed pooling/disposal architecture into Rust.
+Initialization/disposal and writer lifecycle parity with C# remains a
+documented boundary, not a closed equivalence claim. #11 (async streaming),
+#47 (section/layout context; closed by owner decision that explicit section
+association suffices) and #52 (HTTP peer disconnect and response start; core
+delivered, framework service injection and a portable response-start API
+deferred) are all closed. None requires copying a managed pooling/disposal
+architecture into Rust.
 The existing inline #30 contract also includes split UTF-8 and writer errors.
 This increment addresses a demonstrated bridge error-state bug and records
 bounded ownership evidence; it does not complete any of those parent scopes.
@@ -221,7 +224,9 @@ The complete reference fixture matches Debug and Release; only the `common/`
 rows have Rust differential acceptance. This small ASCII/write-error document
 does not cover large-output flush boundaries, throwing disposal, GC/physical
 resources, pooling, HTTP/service lifetime, or cancellation. The separate #69
-fixtures and token contracts are untouched. #11/#47/#52 remain incomplete.
+fixtures and token contracts are untouched. #11/#47/#52/#69 are since closed
+(see the combined cancellation row above); pooling and managed lifetime
+equivalence remain unclaimed.
 
 ## Reproduce the C# golden
 
@@ -335,8 +340,9 @@ These cases do not equate .NET `PipeWriter.Advance` with every possible Rust
 Default fallback cannot discover bytes the trait implementation does not report.
 `flush -> io::Result<()>` still does not expose native `FlushResult` cancellation/
 completion flags. Completion opt-out below does not make Rust root-final-flush
-or slice/destination lifecycle identical to C#. Keep #74/#11/#52 open for
-remaining scope; the whole runtime is not at verified C# parity.
+or slice/destination lifecycle identical to C#. #74 is closed: native flag
+representation was declined as out of scope; the whole runtime is still not at
+verified C# parity.
 
 ### TextWriter-like completion policy
 
