@@ -1,0 +1,16 @@
+[package]
+name = "render-comparison"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+publish = false
+
+[workspace]
+
+[dependencies]
+askama = "=0.12.1"
+maud = "=0.26.0"
+razor-slices = { path = "../../crates/razor-slices" }
+serde = { version = "=1.0.197", features = ["derive"] }
+serde_json = "=1.0.114"
+tera = { version = "=1.19.1", default-features = false }

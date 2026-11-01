@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="$(RazorSlicesSource)/src/RazorSlices/*.cs" Link="Upstream/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="RequirePinnedSource" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(RazorSlicesSource)/src/RazorSlices/RazorSlice.cs')"
+           Text="Set RazorSlicesSource to a clean RazorSlices 0.12.1 checkout at 552937e5f2f21ebcdc73939be014f3d217ffbb22." />
+    <Exec Command="git -C &quot;$(RazorSlicesSource)&quot; rev-parse HEAD" ConsoleToMSBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="ReferenceCommit" />
+    </Exec>
+    <Error Condition="'$(ReferenceCommit)' != '552937e5f2f21ebcdc73939be014f3d217ffbb22'" Text="Wrong upstream revision." />
+    <Exec Command="git -C &quot;$(RazorSlicesSource)&quot; status --porcelain --untracked-files=all" ConsoleToMSBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="ReferenceChanges" />
+    </Exec>
+    <Error Condition="'$(ReferenceChanges)' != ''" Text="Upstream checkout must be clean." />
+  </Target>
+</Project>
