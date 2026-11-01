@@ -40,7 +40,7 @@ An implemented row is not blanket verification of its whole feature.
 | Optional value reuse, nesting/references, custom contracts, original errors, held writes, cancellation/drop and bounded encoding | Implemented | Seven `optional_values` regressions plus two compile-fail doctests reject unsupported contained types. No arbitrary Display/synchronous fallback, implicit flush, or attribute omission change. Every document-byte failure retains its original I/O source and exact accepted prefix. |
 | Character body/nullable/attribute output in the selected common ASCII subset | Verified, bounded | Fourteen `character-values` cases match actual pinned C# PipeWriter/TextWriter output and generated sync text/byte/async Rust paths via `fixtures/character-values.txt`. Character support is additive; broader Unicode/quote-policy equivalence is not claimed. |
 | Character UTF-8/string-encoding consistency, original failures, backpressure, cancellation/drop and byte thresholds | Implemented | Eight `character_values` regressions cover Unicode scalar boundaries, optional/reference attributes, every failure offset including partial UTF-8, final-flush errors, held writes and 16,383/16,384/16,385-byte native/fallback thresholds. Existing bool/float representations stay unchanged. |
-| Boolean/float/quote/Unicode reference behavior beyond the shared subset | Missing, reference characterized | Eighteen C#-only `primitive-outcomes` cases below expose direct/generic boolean path differences and default formatting/encoder policy. These are not Rust differential verification or permission to copy a reference defect/change Rust defaults. |
+| Boolean/float/quote/Unicode reference behavior beyond the shared subset | Verified (5 match) / Decided divergence (13 retained) | All eighteen `primitive-outcomes` cases have an explicit outcome asserted by the `primitive_outcomes` test against the C# fixture: NaN, negative zero (x2) and double-quote match; the rest are documented compatibility decisions below (ADR [0006](adr/0006-primitive-formatting-compatibility.md), Proposed). |
 | Incremental async bodies, layouts and sections preserve ordering/backpressure | Implemented | `async_layouts`, `incremental_async`, `combined_async` tests and exact fixtures, plus async section unit tests; no new C# differential acceptance in this increment. See [async layout evidence](async-layouts.md). |
 | Inclusive 16,384-byte completed-slice automatic flush | Implemented | `automatic_flush` suite and [source-grounded contract](async-rendering.md#automatic-completion-flush). No per-write/arbitrary-await flush; native byte-accounting cases below have differential evidence. |
 | Native pending-byte snapshots override fallback counting, including prebuffered bytes, partially accepted failing writes and draining sinks | Verified, bounded | Eight C# cases in `NativeSinkCases.cs` exactly match `fixtures/native-byte-accounting.txt` and `native_byte_accounting::pinned_csharp_golden_matches_native_and_fallback_accounting`. Default fallback behavior remains unchanged. Native flush-result flags remain unrepresented under #74. |
@@ -524,7 +524,25 @@ are **not** asserted by Rust CI as byte parity:
   BMP/supplementary scalars as `&#x96EA;`/`&#x1F980;`; Rust retains its existing
   UTF-8 text policy.
 
-Broader primitive/encoder compatibility therefore requires an explicit bounded
-policy decision and its own differential cases, not a blanket default-format
-change or copying the direct-boolean path discrepancy. This increment leaves
-all existing Rust representations and public APIs intact.
+### Primitive formatting decisions (#99)
+
+Every one of the eighteen cases now has an explicit outcome, checked by
+`cargo test -p razor-slices --test primitive_outcomes`, which parses the pinned
+C# fixture and asserts that matched cases equal it byte for byte, that retained
+cases still differ, and that Rust's retained representation is pinned.
+
+| Area | Cases | Outcome | Rust output (C#) |
+|------|-------|---------|------------------|
+| NaN, negative zero | `double-nan`, `single-nan`, `double-negative-zero`, `single-negative-zero` | Match | `NaN`, `-0` |
+| Double quote | `character-double-quote` | Match | `&quot;` |
+| Boolean | `bool-{direct,generic}-{true,false}` | Retained | `true`/`false` (`True`/`False`; direct `PipeWriter` path emits nothing, a reference defect that is never copied) |
+| Infinity | `{double,single}-{positive,negative}-infinity` | Retained | `inf`/`-inf` (`Infinity`/`-Infinity`) |
+| Exponents | `double-small-exponent`, `double-large-exponent` | Retained | decimal `Display` (`1E-30`, `1E&#x2B;30`) |
+| Single quote | `character-single-quote` | Retained | `&#39;` (`&#x27;`) |
+| Non-ASCII scalars | `character-unicode`, `rune-supplementary` | Retained | raw UTF-8 (`&#x96EA;`, `&#x1F980;`) |
+
+"Retained" is a deliberate compatibility decision, not an implementation gap:
+changing default output is a hard-to-reverse public choice, so existing Rust
+defaults stay until the owner accepts a change in
+[ADR 0006](adr/0006-primitive-formatting-compatibility.md). Encoder policy
+(single quote, Unicode references) belongs to #98.
