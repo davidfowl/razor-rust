@@ -9,7 +9,7 @@ use std::{
 
 use axum::{
     body::{Body, Bytes},
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{header::CONTENT_TYPE, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use futures_core::Stream;
@@ -83,6 +83,7 @@ const FRAME_SIZE: usize = 1_024;
 pub struct StreamingSliceResponse<S> {
     slice: S,
     status: StatusCode,
+    content_type: HeaderValue,
     cancellation: CancellationToken,
 }
 
@@ -92,6 +93,7 @@ impl<S: AsyncSlice + Send + 'static> StreamingSliceResponse<S> {
         Self {
             slice,
             status: StatusCode::OK,
+            content_type: HeaderValue::from_static(crate::HTML_CONTENT_TYPE),
             cancellation: CancellationToken::new(),
         }
     }
@@ -103,6 +105,14 @@ impl<S: AsyncSlice + Send + 'static> StreamingSliceResponse<S> {
     /// HEAD, dropping the unpolled renderer.
     pub fn with_status(mut self, status: StatusCode) -> Self {
         self.status = status;
+        self
+    }
+
+    /// Overrides the `Content-Type` selected before streaming execution.
+    ///
+    /// Only the header changes; output remains UTF-8 text from the slice.
+    pub fn with_content_type(mut self, content_type: HeaderValue) -> Self {
+        self.content_type = content_type;
         self
     }
 
@@ -130,6 +140,7 @@ impl<S: AsyncSlice + Send + 'static> IntoResponse for StreamingSliceResponse<S> 
         let Self {
             slice,
             status,
+            content_type,
             cancellation,
         } = self;
         let (sender, receiver) = mpsc::channel(1);
@@ -147,7 +158,7 @@ impl<S: AsyncSlice + Send + 'static> IntoResponse for StreamingSliceResponse<S> 
         };
         (
             status,
-            [(CONTENT_TYPE, "text/html; charset=utf-8")],
+            [(CONTENT_TYPE, content_type)],
             Body::from_stream(stream),
         )
             .into_response()
