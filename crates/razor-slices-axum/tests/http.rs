@@ -206,6 +206,20 @@ async fn get_custom_status_and_head_follow_axum_semantics() {
 #[derive(Clone)]
 struct Logs(Arc<Mutex<Vec<u8>>>);
 
+impl Logs {
+    fn new() -> Self {
+        // Without a global subscriber, a parallel test hitting the event callsite first
+        // caches "never" interest, so a scoped subscriber can miss the event.
+        static GLOBAL: std::sync::Once = std::sync::Once::new();
+        GLOBAL.call_once(|| {
+            let _ = tracing::subscriber::set_global_default(
+                tracing_subscriber::fmt().with_writer(io::sink).finish(),
+            );
+        });
+        Self(Arc::new(Mutex::new(Vec::new())))
+    }
+}
+
 impl io::Write for Logs {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         self.0.lock().unwrap().write(bytes)
@@ -224,7 +238,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Logs {
 
 #[tokio::test]
 async fn get_failure_logs_original_error_and_discards_partial_body_and_status() {
-    let logs = Logs(Arc::new(Mutex::new(Vec::new())));
+    let logs = Logs::new();
     let subscriber = tracing_subscriber::fmt()
         .without_time()
         .with_ansi(false)
@@ -482,7 +496,7 @@ impl AsyncSlice for StreamingFailure {
 
 #[tokio::test]
 async fn streaming_failure_logs_original_source_and_is_an_error_not_successful_eof() {
-    let logs = Logs(Arc::new(Mutex::new(Vec::new())));
+    let logs = Logs::new();
     let subscriber = tracing_subscriber::fmt()
         .without_time()
         .with_ansi(false)
@@ -1143,7 +1157,7 @@ async fn explicit_token_cancellation_is_logged_original_body_error_not_eof() {
         output.frame().await.unwrap().unwrap().into_data().unwrap(),
         b"prefix".as_slice()
     );
-    let logs = Logs(Arc::new(Mutex::new(Vec::new())));
+    let logs = Logs::new();
     let subscriber = tracing_subscriber::fmt()
         .without_time()
         .with_ansi(false)
