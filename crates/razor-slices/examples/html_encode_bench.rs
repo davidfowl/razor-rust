@@ -12,7 +12,9 @@
 //! ```sh
 //! cargo run -p razor-slices --example html_encode_bench --release
 //! ```
-use razor_slices::encode_html_to_writer;
+use razor_slices::{
+    encode_html_to_writer, DefaultHtmlEncoder, HtmlEncoderPolicy, UnicodeHtmlEncoder,
+};
 use std::time::Instant;
 
 /// The byte-by-byte scalar scan used before adopting `memchr` (ADR 0005),
@@ -127,5 +129,49 @@ fn main() {
             memchr_time.as_secs_f64() * 1e9 / (iters as f64 * len as f64),
             speedup
         );
+    }
+
+    default_policy_regression_check();
+}
+
+/// ADR 0007 guard: the default policy (through `&dyn HtmlEncoderPolicy`) must
+/// stay within noise of the free function; fails above 1.5x. The opt-in
+/// Unicode policy is reported for information only.
+fn default_policy_regression_check() {
+    println!(
+        "\n{:<28} {:>12} {:>12} {:>10}",
+        "policy check", "free (ms)", "default (ms)", "ratio"
+    );
+    let policy: &dyn HtmlEncoderPolicy = &DefaultHtmlEncoder;
+    for (name, len, every) in [("no_escapes_8kb", 8192, 0), ("dense_8kb", 8192, 8)] {
+        let payload = make_payload(len, every, b"<>&\"'");
+        let iters = 5_000;
+        let free = time_iters(iters, || {
+            let mut out = Vec::with_capacity(len);
+            encode_html_to_writer(&payload, &mut out).unwrap();
+            std::hint::black_box(&out);
+        });
+        let via_policy = time_iters(iters, || {
+            let mut out = Vec::with_capacity(len);
+            policy.encode_to_writer(&payload, &mut out).unwrap();
+            std::hint::black_box(&out);
+        });
+        let unicode = time_iters(iters, || {
+            let mut out = Vec::with_capacity(len);
+            UnicodeHtmlEncoder
+                .encode_to_writer(&payload, &mut out)
+                .unwrap();
+            std::hint::black_box(&out);
+        });
+        let ratio = via_policy.as_secs_f64() / free.as_secs_f64();
+        println!(
+            "{:<28} {:>12.2} {:>12.2} {:>9.2}x  (unicode opt-in: {:.2} ms)",
+            name,
+            free.as_secs_f64() * 1000.0,
+            via_policy.as_secs_f64() * 1000.0,
+            ratio,
+            unicode.as_secs_f64() * 1000.0
+        );
+        assert!(ratio < 1.5, "default policy regressed: {name} {ratio:.2}x");
     }
 }

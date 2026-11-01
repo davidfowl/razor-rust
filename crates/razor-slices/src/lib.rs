@@ -29,7 +29,10 @@ pub use async_slice::{
 pub use attribute::{
     attribute, AsyncAttributeValue, Attribute, AttributeValue, InvalidAttributeName,
 };
-pub use html::{encode_html_to, encode_html_to_writer, HtmlString, WriteHtmlValue};
+pub use html::{
+    encode_html_to, encode_html_to_writer, DefaultHtmlEncoder, Encoded, Escape, HtmlEncoderPolicy,
+    HtmlString, UnicodeHtmlEncoder, WriteHtmlValue,
+};
 pub use inline::InlineSlice;
 pub use integer::{format_integer, FormattedInteger, IntegerFormat};
 pub use layout::{declare_layout, with_layout, DeclaredLayout, Layout};
